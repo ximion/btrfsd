@@ -1,0 +1,15 @@
+# See https://editorconfig.org/
+root = true
+
+[*]
+end_of_line = lf
+trim_trailing_whitespace = true
+charset = utf-8
+
+[*.{c,h}]
+indent_style = space
+indent_size = 4
+
+[*.xml]
+indent_style = space
+indent_size = 2
