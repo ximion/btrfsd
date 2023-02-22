@@ -1,0 +1,9 @@
+
+#
+# For development
+#
+option('maintainer',
+       type : 'boolean',
+       value : false,
+       description : 'Enable maintainer mode (use strict compiler flags, e.g. -Werror)'
+)
