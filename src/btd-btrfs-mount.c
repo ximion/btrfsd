@@ -202,7 +202,7 @@ btd_btrfs_mount_new (const gchar *device, const gchar *mountpoint)
  * btd_btrfs_mount_get_device_name:
  * @self: An instance of #BtdBtrfsMount.
  *
- * Get the device name backing this mountpoint.
+ * Returns: The device name backing this mountpoint.
  */
 const gchar *
 btd_btrfs_mount_get_device_name (BtdBtrfsMount *self)
@@ -215,7 +215,7 @@ btd_btrfs_mount_get_device_name (BtdBtrfsMount *self)
  * btd_btrfs_mount_get_mountpoint:
  * @self: An instance of #BtdBtrfsMount.
  *
- * Get the mountpoint path.
+ * Returns: The mountpoint path.
  */
 const gchar *
 btd_btrfs_mount_get_mountpoint (BtdBtrfsMount *self)
@@ -293,7 +293,7 @@ btd_parse_btrfs_device_stats (JsonArray *array, gboolean *errors_found)
  * @errors_found: (out) (optional): Set to %TRUE if any errors were detected.
  * @error: A #GError, set if we failed to read statistics.
  *
- * @return
+ * Returns: %TRUE if stats were read successfully.
  */
 gboolean
 btd_btrfs_mount_read_error_stats (BtdBtrfsMount *self,
@@ -322,7 +322,7 @@ btd_btrfs_mount_read_error_stats (BtdBtrfsMount *self,
                        &stderr_output,
                        &btrfs_exit_code,
                        &tmp_error)) {
-        g_propagate_prefixed_error (error, tmp_error, "Failed to execute btrfs command:");
+        g_propagate_prefixed_error (error, tmp_error, "Failed to execute btrfs stats command:");
         return FALSE;
     }
 
@@ -356,5 +356,60 @@ btd_btrfs_mount_read_error_stats (BtdBtrfsMount *self,
     if (report != NULL)
         *report = g_steal_pointer (&tmp_report);
 
+    return TRUE;
+}
+
+/**
+ * btd_btrfs_mount_scrub:
+ * @self: An instance of #BtdBtrfsMount.
+ * @error: A #GError, set if scrub failed.
+ *
+ * Returns: %TRUE if scrub operation completed without errors.
+ */
+gboolean
+btd_btrfs_mount_scrub (BtdBtrfsMount *self, GError **error)
+{
+    BtdBtrfsMountPrivate *priv = GET_PRIVATE (self);
+    GError *tmp_error = NULL;
+    gint btrfs_exit_code;
+    g_autofree gchar *btrfs_stdout = NULL;
+    g_autofree gchar *btrfs_stderr = NULL;
+
+    gchar *command[] = { BTRFS_CMD, "-q", "scrub", "start", "-B", priv->mountpoint, NULL };
+    if (!g_spawn_sync (NULL, /* working directory */
+                       command,
+                       NULL, /* envp */
+                       G_SPAWN_DEFAULT,
+                       NULL,
+                       NULL,
+                       &btrfs_stdout,
+                       &btrfs_stderr,
+                       &btrfs_exit_code,
+                       &tmp_error)) {
+        g_propagate_prefixed_error (error, tmp_error, "Failed to execute btrfs scrub command:");
+        return FALSE;
+    }
+
+    if (btrfs_exit_code != 0) {
+        g_autofree gchar *output_msg = NULL;
+        btrfs_stdout = btd_strstripnl (btrfs_stdout);
+        btrfs_stderr = btd_strstripnl (btrfs_stderr);
+
+        if (btd_is_empty (btrfs_stdout))
+            output_msg = g_steal_pointer (&btrfs_stderr);
+        else if (btd_is_empty (btrfs_stderr))
+            output_msg = g_steal_pointer (&btrfs_stdout);
+        else
+            output_msg = g_strconcat (btrfs_stderr, "\n", btrfs_stdout, NULL);
+
+        g_set_error (error,
+                     BTD_BTRFS_ERROR,
+                     BTD_BTRFS_ERROR_SCRUB_FAILED,
+                     "Scrub action failed: %s",
+                     output_msg);
+        return FALSE;
+    }
+
+    /* scrub ran successfully */
     return TRUE;
 }

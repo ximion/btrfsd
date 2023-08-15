@@ -12,14 +12,16 @@ G_BEGIN_DECLS
 
 /**
  * BtdBtrfsError:
- * @BTD_BTRFS_ERROR_FAILED:		Generic failure
- * @BTD_BTRFS_ERROR_PARSE:		Data parsing failed
+ * @BTD_BTRFS_ERROR_FAILED:        Generic failure
+ * @BTD_BTRFS_ERROR_PARSE:         Data parsing failed
+ * @BTD_BTRFS_ERROR_SCRUB_FAILED:  Scrub operation failed.
  *
  * The error type.
  **/
 typedef enum {
     BTD_BTRFS_ERROR_FAILED,
     BTD_BTRFS_ERROR_PARSE,
+    BTD_BTRFS_ERROR_SCRUB_FAILED,
     /*< private >*/
     BTD_BTRFS_ERROR_LAST
 } BtdBtrfsError;
@@ -52,5 +54,7 @@ gboolean       btd_btrfs_mount_read_error_stats (BtdBtrfsMount *self,
                                                  gchar        **report,
                                                  gboolean      *errors_found,
                                                  GError       **error);
+
+gboolean       btd_btrfs_mount_scrub (BtdBtrfsMount *self, GError **error);
 
 G_END_DECLS
