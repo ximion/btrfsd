@@ -17,6 +17,7 @@
 #include "btd-btrfs-mount.h"
 
 #include <libmount/libmount.h>
+#include <json-glib/json-glib.h>
 
 #include "btd-utils.h"
 
@@ -38,6 +39,13 @@ static GParamSpec *obj_properties[N_PROPERTIES] = {
 
 G_DEFINE_TYPE_WITH_PRIVATE (BtdBtrfsMount, btd_btrfs_mount, G_TYPE_OBJECT)
 #define GET_PRIVATE(o) (btd_btrfs_mount_get_instance_private (o))
+
+/**
+ * btd_btrfs_error_quark:
+ *
+ * Return value: An error quark.
+ */
+G_DEFINE_QUARK (btd-btrfs-error-quark, btd_btrfs_error)
 
 /**
  * btd_find_mounted_btrfs_filesystems:
@@ -214,4 +222,139 @@ btd_btrfs_mount_get_mountpoint (BtdBtrfsMount *self)
 {
     BtdBtrfsMountPrivate *priv = GET_PRIVATE (self);
     return priv->mountpoint;
+}
+
+static gchar *
+btd_parse_btrfs_device_stats (JsonArray *array, gboolean *errors_found)
+{
+    g_autoptr(GString) intro_text = NULL;
+    g_autoptr(GString) issues_text = NULL;
+    gboolean have_errors = FALSE;
+
+    intro_text = g_string_new ("Registered Devices:\n");
+    issues_text = g_string_new ("Issue Report:\n");
+
+    for (guint i = 0; i < json_array_get_length (array); i++) {
+        JsonObject *obj = json_array_get_object_element (array, i);
+
+        const gchar *device = json_object_get_string_member (obj, "device");
+        const gchar *devid = json_object_get_string_member (obj, "devid");
+        gint64 write_io_errs = json_object_get_int_member (obj, "write_io_errs");
+        gint64 read_io_errs = json_object_get_int_member (obj, "read_io_errs");
+        gint64 flush_io_errs = json_object_get_int_member (obj, "flush_io_errs");
+        gint64 corruption_errs = json_object_get_int_member (obj, "corruption_errs");
+        gint64 generation_errs = json_object_get_int_member (obj, "generation_errs");
+
+        /* add device to the known devices list */
+        g_string_append_printf (intro_text, "  • %s\n", device);
+
+        /* if there are no errors, we don't add that information to the report */
+        if (write_io_errs == 0 && read_io_errs == 0 && flush_io_errs == 0 && corruption_errs == 0 &&
+            generation_errs == 0)
+            continue;
+
+        /* we have issues, make a full report */
+        have_errors = TRUE;
+        g_string_append_printf (issues_text, "Device: %s\n", device);
+        g_string_append_printf (issues_text, "Devid:  %s\n", devid);
+        g_string_append_printf (issues_text,
+                                "Write IO Errors: %" G_GINT64_FORMAT "\n",
+                                write_io_errs);
+        g_string_append_printf (issues_text,
+                                "Read IO Errors:  %" G_GINT64_FORMAT "\n",
+                                read_io_errs);
+        g_string_append_printf (issues_text,
+                                "Flush IO Errors: %" G_GINT64_FORMAT "\n",
+                                flush_io_errs);
+        g_string_append_printf (issues_text,
+                                "Corruption Errors: %" G_GINT64_FORMAT "\n",
+                                corruption_errs);
+        g_string_append_printf (issues_text,
+                                "Generation Errors: %" G_GINT64_FORMAT "\n\n",
+                                generation_errs);
+    }
+
+    if (errors_found != NULL)
+        *errors_found = have_errors;
+
+    /* finalize report */
+    if (!have_errors)
+        g_string_append (issues_text, "  • No errors found\n");
+    g_string_append (intro_text, "\n");
+    g_string_prepend (issues_text, intro_text->str);
+
+    return g_string_free (g_steal_pointer (&issues_text), FALSE);
+}
+
+/**
+ * btd_btrfs_mount_read_error_stats:
+ * @self: An instance of #BtdBtrfsMount.
+ * @report: (out) (optional) (not nullable): Destination of a string report text.
+ * @errors_found: (out) (optional): Set to %TRUE if any errors were detected.
+ * @error: A #GError, set if we failed to read statistics.
+ *
+ * @return
+ */
+gboolean
+btd_btrfs_mount_read_error_stats (BtdBtrfsMount *self,
+                                  gchar **report,
+                                  gboolean *errors_found,
+                                  GError **error)
+{
+    BtdBtrfsMountPrivate *priv = GET_PRIVATE (self);
+    GError *tmp_error = NULL;
+    gint btrfs_exit_code;
+    g_autofree gchar *stats_output = NULL;
+    g_autofree gchar *stderr_output = NULL;
+    g_autoptr(JsonParser) parser = NULL;
+    g_autofree gchar *tmp_report = NULL;
+    JsonObject *root = NULL;
+    JsonArray *device_stats = NULL;
+
+    gchar *command[] = { BTRFS_CMD, "--format=json", "device", "stats", priv->mountpoint, NULL };
+    if (!g_spawn_sync (NULL, /* working directory */
+                       command,
+                       NULL, /* envp */
+                       G_SPAWN_DEFAULT,
+                       NULL,
+                       NULL,
+                       &stats_output,
+                       &stderr_output,
+                       &btrfs_exit_code,
+                       &tmp_error)) {
+        g_propagate_prefixed_error (error, tmp_error, "Failed to execute btrfs command:");
+        return FALSE;
+    }
+
+    if (btrfs_exit_code != 0) {
+        g_set_error (error,
+                     BTD_BTRFS_ERROR,
+                     BTD_BTRFS_ERROR_FAILED,
+                     "Running btrfs stats has failed: %s",
+                     btd_strstripnl (stderr_output));
+        return FALSE;
+    }
+
+    parser = json_parser_new ();
+    if (!json_parser_load_from_data (parser, stats_output, -1, &tmp_error)) {
+        g_propagate_prefixed_error (error, tmp_error, "Failed to parse btrfs stats JSON:");
+        return FALSE;
+    }
+
+    root = json_node_get_object (json_parser_get_root (parser));
+    device_stats = json_object_get_array_member (root, "device-stats");
+    if (device_stats == NULL) {
+        g_set_error_literal (error,
+                             BTD_BTRFS_ERROR,
+                             BTD_BTRFS_ERROR_PARSE,
+                             "Failed to parse stats output: No 'device-stats' section.");
+        return FALSE;
+    }
+
+    /* parse stats & generate report */
+    tmp_report = btd_parse_btrfs_device_stats (device_stats, errors_found);
+    if (report != NULL)
+        *report = g_steal_pointer (&tmp_report);
+
+    return TRUE;
 }

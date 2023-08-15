@@ -18,5 +18,6 @@ G_BEGIN_DECLS
 #define btd_str_equal0(str1, str2) (g_strcmp0 ((gchar *) str1, (gchar *) str2) == 0)
 
 gboolean btd_is_empty (const gchar *str);
+gchar   *btd_strstripnl (gchar *string);
 
 G_END_DECLS

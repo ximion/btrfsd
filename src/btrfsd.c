@@ -56,16 +56,16 @@ main (int argc, char **argv)
     gboolean show_status = FALSE;
 
     const GOptionEntry options[] = {
-        {"verbose",
+        { "verbose",
          'v', 0,
          G_OPTION_ARG_NONE, &verbose,
          "Show extra debugging information", NULL },
-        { "version",        '\0', 0, G_OPTION_ARG_NONE, &show_version, "Show the program version.", NULL },
+        { "version", '\0', 0, G_OPTION_ARG_NONE, &show_version, "Show the program version.", NULL },
         { "status",
          '\0', 0,
          G_OPTION_ARG_NONE, &show_status,
          "Display some short status information.", NULL },
-        { NULL    }
+        { NULL }
     };
 
     setlocale (LC_ALL, "");
