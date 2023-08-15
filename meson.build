@@ -107,6 +107,7 @@ glib_dep = dependency('glib-2.0', version: '>= 2.72')
 gobject_dep = dependency('gobject-2.0', version: '>= 2.72')
 gio_dep = dependency('gio-2.0', version: '>= 2.72')
 json_glib_dep = dependency('json-glib-1.0', version: '>= 1.6.2')
+mount_dep = dependency('mount')
 
 #
 # Modules
