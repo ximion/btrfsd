@@ -27,4 +27,6 @@ struct _BtdSchedulerClass {
 BtdScheduler *btd_scheduler_new (void);
 gboolean      btd_scheduler_load (BtdScheduler *self, GError **error);
 
+gboolean      btd_scheduler_run (BtdScheduler *self, GError **error);
+
 G_END_DECLS

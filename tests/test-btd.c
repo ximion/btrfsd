@@ -21,8 +21,8 @@ test_duration_parser (void)
     g_assert_cmpint (btd_parse_duration_string ("4d"), ==, 86400 * 4);
     g_assert_cmpint (btd_parse_duration_string ("1w"), ==, 604800);
     g_assert_cmpint (btd_parse_duration_string ("4w"), ==, 604800 * 4);
-    g_assert_cmpint (btd_parse_duration_string ("1m"), ==, 2630016);
-    g_assert_cmpint (btd_parse_duration_string ("3m"), ==, 2630016 * 3);
+    g_assert_cmpint (btd_parse_duration_string ("1M"), ==, 2630016);
+    g_assert_cmpint (btd_parse_duration_string ("3M"), ==, 2630016 * 3);
     g_assert_cmpint (btd_parse_duration_string ("notvalid"), ==, 0);
     g_assert_cmpint (btd_parse_duration_string ("2u"), ==, 0);
 }

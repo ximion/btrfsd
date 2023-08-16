@@ -112,7 +112,7 @@ btd_parse_duration_string (const gchar *str)
     case 'w':
         multiplier = SECONDS_IN_A_WEEK;
         break;
-    case 'm':
+    case 'M':
         multiplier = SECONDS_IN_A_MONTH;
         break;
 

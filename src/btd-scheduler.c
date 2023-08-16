@@ -21,8 +21,11 @@ typedef struct {
     gboolean loaded;
     GPtrArray *mountpoints;
     GKeyFile *config;
-
     gchar *state_dir;
+
+    gulong default_scub_interval;
+    gulong default_stats_interval;
+    gulong default_balance_interval;
 } BtdSchedulerPrivate;
 
 G_DEFINE_TYPE_WITH_PRIVATE (BtdScheduler, btd_scheduler, G_TYPE_OBJECT)
@@ -73,6 +76,36 @@ btd_scheduler_new ()
     return BTD_SCHEDULER (self);
 }
 
+static gulong
+btd_scheduler_get_config_duration_str (BtdScheduler *self,
+                                       const gchar *group,
+                                       const gchar *key,
+                                       const gchar *default_value)
+{
+    BtdSchedulerPrivate *priv = GET_PRIVATE (self);
+    g_autofree gchar *value = NULL;
+
+    value = g_key_file_get_string (priv->config, group, key, NULL);
+    if (value == NULL)
+        return btd_parse_duration_string (default_value);
+    return btd_parse_duration_string (value);
+}
+
+static gulong
+btd_scheduler_get_config_duration (BtdScheduler *self,
+                                   const gchar *group,
+                                   const gchar *key,
+                                   gulong default_value)
+{
+    BtdSchedulerPrivate *priv = GET_PRIVATE (self);
+    g_autofree gchar *value = NULL;
+
+    value = g_key_file_get_string (priv->config, group, key, NULL);
+    if (value == NULL)
+        return default_value;
+    return btd_parse_duration_string (value);
+}
+
 /**
  * btd_scheduler_load:
  * @self: An instance of #BtdScheduler
@@ -110,6 +143,56 @@ btd_scheduler_load (BtdScheduler *self, GError **error)
         }
     }
 
+    priv->default_scub_interval = btd_scheduler_get_config_duration_str (self,
+                                                                         "default",
+                                                                         "ScrubInterval",
+                                                                         "1M");
+    priv->default_stats_interval = btd_scheduler_get_config_duration_str (self,
+                                                                          "default",
+                                                                          "StatsInterval",
+                                                                          "1h");
+    priv->default_balance_interval = btd_scheduler_get_config_duration_str (self,
+                                                                            "default",
+                                                                            "BalanceInterval",
+                                                                            "6M");
+
     priv->loaded = TRUE;
+    return TRUE;
+}
+
+/**
+ * btd_scheduler_run:
+ * @self: An instance of #BtdScheduler
+ * @error: A #GError
+ *
+ * Run any actions that are pending.
+ *
+ * Returns: %TRUE on success.
+ */
+gboolean
+btd_scheduler_run (BtdScheduler *self, GError **error)
+{
+    BtdSchedulerPrivate *priv = GET_PRIVATE (self);
+
+    /* load, in case we haven't loaded configuration yet */
+    if (!priv->loaded) {
+        if (!btd_scheduler_load (self, error))
+            return FALSE;
+    }
+
+    /* check if there is anything for us to do */
+    if (priv->mountpoints->len == 0) {
+        g_debug ("No mounted Btrfs filesystems found.");
+        return TRUE;
+    }
+
+    /* run tasks */
+    for (guint i = 0; i < priv->mountpoints->len; i++) {
+        BtdBtrfsMount *bmount = g_ptr_array_index (priv->mountpoints, i);
+        g_print ("  • %s  →  %s\n",
+                 btd_btrfs_mount_get_mountpoint (bmount),
+                 btd_btrfs_mount_get_device_name (bmount));
+    }
+
     return TRUE;
 }
