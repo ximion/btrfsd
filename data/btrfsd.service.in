@@ -1,0 +1,9 @@
+[Unit]
+Description=Btrfs maintenance daemon
+After=fstrim.service
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/btrfsd
+IOSchedulingClass=idle
+CPUSchedulingPolicy=idle

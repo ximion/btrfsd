@@ -1,0 +1,11 @@
+[Unit]
+Description=Perform Btrfs maintenance actions
+Documentation=man:btrfs
+
+[Timer]
+OnUnitActiveSec=1h
+RandomizedDelaySec=10m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

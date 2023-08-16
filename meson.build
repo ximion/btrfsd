@@ -104,6 +104,7 @@ endif
 #
 # Dependencies
 #
+systemd_dep = dependency('systemd')
 glib_dep = dependency('glib-2.0', version: '>= 2.72')
 gobject_dep = dependency('gobject-2.0', version: '>= 2.72')
 gio_dep = dependency('gio-2.0', version: '>= 2.72')
@@ -120,3 +121,4 @@ glib = import('gnome')
 # Directories
 #
 subdir('src/')
+subdir('data/')
