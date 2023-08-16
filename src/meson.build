@@ -8,6 +8,12 @@ btrfsd_src = [
     'btd-utils.c',
 ]
 
+btrfsd_res = glib.compile_resources (
+    'btrfsd-resources', 'btrfsd.gresource.xml',
+    c_name: 'btd',
+    source_dir: ['../data']
+)
+
 btrfsd_deps = [
     glib_dep,
     gobject_dep,
@@ -18,7 +24,7 @@ btrfsd_deps = [
 
 btrfsd_lib = static_library(
     'btrfsd',
-    sources: [btrfsd_src],
+    sources: [btrfsd_src, btrfsd_res],
     dependencies: btrfsd_deps,
     include_directories: [root_inc_dir],
 )

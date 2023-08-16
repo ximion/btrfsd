@@ -1,0 +1,11 @@
+To: $BTRFS_MAILADDR
+Subject: Btrfs device issue on $MM @ $HOSTNAME
+This is an automatically generated mail message from btrfsd
+running on $HOSTNAME
+An issue has been detected on the btrfs device mounted as $MM.
+You will be getting this email daily until you clear the issue with 'btrfs device stats --reset $MM'
+Faithfully yours, etc.
+P.S. The 'btrfs device stats' output is:
+$DEVSTATS
+Filesystem usage:
+$(btrfs fi df $MM 2>&1)
