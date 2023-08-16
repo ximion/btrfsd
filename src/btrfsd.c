@@ -10,6 +10,7 @@
 #include <glib/gi18n.h>
 #include <locale.h>
 
+#include "btd-scheduler.h"
 #include "btd-btrfs-mount.h"
 
 /**
@@ -50,6 +51,7 @@ main (int argc, char **argv)
 {
     g_autoptr(GOptionContext) option_context = NULL;
     g_autoptr(GError) error = NULL;
+    g_autoptr(BtdScheduler) scheduler = NULL;
     gboolean ret;
     gboolean verbose = FALSE;
     gboolean show_version = FALSE;
@@ -89,12 +91,16 @@ main (int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
+    scheduler = btd_scheduler_new ();
+    if (!btd_scheduler_load (scheduler, &error)) {
+        g_printerr ("Failed to initialize: %s\n", error->message);
+        return EXIT_FAILURE;
+    }
+
     if (show_status) {
         /* display status information */
         return btd_show_status ();
     }
-
-    /* TODO */
 
     return EXIT_SUCCESS;
 }

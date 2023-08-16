@@ -20,4 +20,6 @@ G_BEGIN_DECLS
 gboolean btd_is_empty (const gchar *str);
 gchar   *btd_strstripnl (gchar *string);
 
+gulong   btd_parse_duration_string (const gchar *str);
+
 G_END_DECLS

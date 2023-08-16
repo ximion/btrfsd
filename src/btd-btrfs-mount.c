@@ -7,7 +7,6 @@
 /**
  * SECTION:btd-btrfs-mount
  * @short_description: An active Btrfs mountpoint on the system that can be acted on.
- * @include: appstream.h
  *
  * Defines an active Btrfs mountpoint on the current system, and can perform
  * various actions on it.

@@ -122,3 +122,4 @@ glib = import('gnome')
 #
 subdir('src/')
 subdir('data/')
+subdir('tests/')

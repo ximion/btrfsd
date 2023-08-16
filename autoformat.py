@@ -18,6 +18,7 @@ from glob import glob
 INCLUDE_LOCATIONS = [
     'autoformat.py',
     'src',
+    'tests',
 ]
 
 EXCLUDE_MATCH = []

@@ -14,6 +14,12 @@
 #include "config.h"
 #include "btd-utils.h"
 
+#define SECONDS_IN_AN_HOUR (60 * 60)
+#define SECONDS_IN_A_DAY   (24 * SECONDS_IN_AN_HOUR)
+#define SECONDS_IN_A_WEEK  (7 * SECONDS_IN_A_DAY)
+/* we assume an average month has approximately 30.44 days here */
+#define SECONDS_IN_A_MONTH ((int) (30.44 * SECONDS_IN_A_DAY))
+
 /**
  * btd_is_empty:
  * @str: The string to test.
@@ -69,4 +75,56 @@ btd_strstripnl (gchar *string)
 
     memmove (string, start, strlen ((gchar *) start) + 1);
     return string;
+}
+
+/**
+ * btd_parse_duration_string:
+ * @str: The string to parse.
+ *
+ * Returns: The duration in seconds, or 0 on error.
+ */
+gulong
+btd_parse_duration_string (const gchar *str)
+{
+    gchar suffix;
+    gint64 value;
+    guint str_len;
+    gulong multiplier = 1;
+
+    if (btd_is_empty (str))
+        return 0;
+    str_len = strlen (str);
+    if (str_len < 1)
+        return 0;
+
+    suffix = str[str_len - 1];
+    value = g_ascii_strtoll (str, NULL, 10);
+    if (value <= 0)
+        return 0;
+
+    switch (suffix) {
+    case 'h':
+        multiplier = SECONDS_IN_AN_HOUR;
+        break;
+    case 'd':
+        multiplier = SECONDS_IN_A_DAY;
+        break;
+    case 'w':
+        multiplier = SECONDS_IN_A_WEEK;
+        break;
+    case 'm':
+        multiplier = SECONDS_IN_A_MONTH;
+        break;
+
+    default:
+        /* the last character not being a digit is an error */
+        if (!g_ascii_isdigit (suffix))
+            return 0;
+
+        /* if no suffix, default to hours */
+        multiplier = SECONDS_IN_AN_HOUR;
+        break;
+    }
+
+    return value * multiplier;
 }
