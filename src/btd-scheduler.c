@@ -37,7 +37,7 @@ btd_scheduler_init (BtdScheduler *self)
     BtdSchedulerPrivate *priv = GET_PRIVATE (self);
 
     priv->config = g_key_file_new ();
-    priv->state_dir = g_build_filename (LOCALSTATEDIR, "lib", "btrfsd", NULL);
+    priv->state_dir = btd_get_state_dir ();
 }
 
 static void
@@ -160,6 +160,20 @@ btd_scheduler_load (BtdScheduler *self, GError **error)
     return TRUE;
 }
 
+static gboolean
+btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount)
+{
+    return TRUE;
+}
+
+static gboolean
+btd_scheduler_run_for_mount (BtdScheduler *self, BtdBtrfsMount *bmount)
+{
+    BtdSchedulerPrivate *priv = GET_PRIVATE (self);
+
+    return TRUE;
+}
+
 /**
  * btd_scheduler_run:
  * @self: An instance of #BtdScheduler
@@ -174,7 +188,7 @@ btd_scheduler_run (BtdScheduler *self, GError **error)
 {
     BtdSchedulerPrivate *priv = GET_PRIVATE (self);
 
-    /* load, in case we haven't loaded configuration yet */
+    /* load configuration in case we haven't loaded it yet */
     if (!priv->loaded) {
         if (!btd_scheduler_load (self, error))
             return FALSE;
@@ -189,9 +203,7 @@ btd_scheduler_run (BtdScheduler *self, GError **error)
     /* run tasks */
     for (guint i = 0; i < priv->mountpoints->len; i++) {
         BtdBtrfsMount *bmount = g_ptr_array_index (priv->mountpoints, i);
-        g_print ("  • %s  →  %s\n",
-                 btd_btrfs_mount_get_mountpoint (bmount),
-                 btd_btrfs_mount_get_device_name (bmount));
+        btd_scheduler_run_for_mount (self, bmount);
     }
 
     return TRUE;

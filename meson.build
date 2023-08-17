@@ -27,8 +27,8 @@ conf.set_quoted('PACKAGE_VERSION', btrfsd_version)
 conf.set_quoted('GETTEXT_PACKAGE', 'btrfsd')
 conf.set_quoted('LOCALEDIR',
                 get_option('prefix') / get_option('localedir'))
-conf.set_quoted('LOCALSTATEDIR',
-                get_option('prefix') / get_option('localstatedir'))
+conf.set_quoted('SHAREDSTATEDIR',
+                get_option('prefix') / get_option('sharedstatedir'))
 conf.set_quoted('LIBEXECDIR',
                 get_option('prefix') / get_option('libexecdir'))
 conf.set_quoted('DATADIR',

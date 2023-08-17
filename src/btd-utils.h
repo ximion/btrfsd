@@ -20,6 +20,12 @@ G_BEGIN_DECLS
 gboolean btd_is_empty (const gchar *str);
 gchar   *btd_strstripnl (gchar *string);
 
+gchar   *btd_get_state_dir (void);
+
 gulong   btd_parse_duration_string (const gchar *str);
+
+gchar   *btd_render_template (const gchar *template, const gchar *key1, ...) G_GNUC_NULL_TERMINATED;
+
+gchar   *btd_path_to_filename (const gchar *path);
 
 G_END_DECLS

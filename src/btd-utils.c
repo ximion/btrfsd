@@ -78,6 +78,19 @@ btd_strstripnl (gchar *string)
 }
 
 /**
+ * btd_get_state_dir:
+ *
+ * Returns: (transfer full): the state dir for Btrfsd.
+ */
+gchar *
+btd_get_state_dir (void)
+{
+    gchar *path = g_build_filename (SHAREDSTATEDIR, "btrfsd", NULL);
+    g_mkdir_with_parents (path, 0644);
+    return path;
+}
+
+/**
  * btd_parse_duration_string:
  * @str: The string to parse.
  *
@@ -127,4 +140,101 @@ btd_parse_duration_string (const gchar *str)
     }
 
     return value * multiplier;
+}
+
+/**
+ * btd_render_template:
+ * @template: the template to render
+ *
+ * Formats a template string to replace all placeholder key with the
+ * given values.
+ *
+ * Returns: (transfer full): Template text with variables replaced.
+ **/
+gchar *
+btd_render_template (const gchar *template, const gchar *key1, ...)
+{
+    va_list args;
+    const gchar *cur_key;
+    const gchar *cur_val;
+    g_auto(GStrv) parts = NULL;
+    g_autoptr(GPtrArray) vars = g_ptr_array_new ();
+
+    if (template == NULL)
+        return NULL;
+    if (key1 == NULL)
+        return g_strdup (template);
+
+    /* prepare variable list */
+    va_start (args, key1);
+    cur_key = key1;
+    while (cur_key != NULL) {
+        cur_val = va_arg (args, gchar *);
+        if (cur_val == NULL)
+            cur_val = "";
+        g_ptr_array_add (vars, (gchar *) cur_key);
+        g_ptr_array_add (vars, (gchar *) cur_val);
+
+        cur_key = va_arg (args, gchar *);
+    }
+    va_end (args);
+
+    /* sanity check */
+    g_return_val_if_fail (vars->len % 2 == 0, NULL);
+
+    /* replace variables */
+    parts = g_strsplit (template, "{{", -1);
+    for (guint i = 0; parts[i] != NULL; i++) {
+        gboolean replaced = FALSE;
+
+        for (guint j = 0; j < vars->len; j += 2) {
+            g_autofree gchar *tmp = g_strconcat (g_ptr_array_index (vars, j), "}}", NULL);
+            if (!g_str_has_prefix (parts[i], tmp))
+                continue;
+
+            /* replace string */
+            parts[i] = parts[i] + strlen (tmp);
+            parts[i] = g_strconcat (g_ptr_array_index (vars, j + 1), parts[i], NULL);
+            replaced = TRUE;
+            break;
+        }
+
+        if (!replaced && (i != 0)) {
+            g_autofree gchar *tmp = NULL;
+
+            /* keep the placeholder in place */
+            tmp = parts[i];
+            parts[i] = g_strconcat ("{{", parts[i], NULL);
+        }
+    }
+
+    return g_strjoinv ("", parts);
+}
+
+/**
+ * btd_path_to_filename:
+ * @path: The path to convert.
+ *
+ * Returns: (transfer full): A filename representing the path.
+ */
+gchar *
+btd_path_to_filename (const gchar *path)
+{
+    GString *str;
+
+    str = g_string_new (path);
+    if (g_str_has_prefix (str->str, "/"))
+        g_string_erase (str, 0, 1);
+    if (g_str_has_prefix (str->str, "."))
+        g_string_prepend_c (str, '_');
+    if (str->len == 0) {
+        /* we hit the root path / */
+        g_string_free (str, TRUE);
+        return g_strdup ("-");
+    }
+
+    g_string_replace (str, "/", "-", 0);
+    g_string_replace (str, "\\", "-", 0);
+
+    return g_string_free (str, FALSE);
 }

@@ -2,6 +2,8 @@
 btrfsd_src = [
     'btd-btrfs-mount.h',
     'btd-btrfs-mount.c',
+    'btd-mount-record.h',
+    'btd-mount-record.c',
     'btd-scheduler.h',
     'btd-scheduler.c',
     'btd-utils.h',
