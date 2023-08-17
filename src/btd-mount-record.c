@@ -34,6 +34,46 @@ static GParamSpec *obj_properties[N_PROPERTIES] = {
 G_DEFINE_TYPE_WITH_PRIVATE (BtdMountRecord, btd_mount_record, G_TYPE_OBJECT)
 #define GET_PRIVATE(o) (btd_mount_record_get_instance_private (o))
 
+/**
+ * btd_btrfs_action_to_string:
+ * @kind: the %BtdBtrfsAction.
+ *
+ * Converts the enumerated value to an text representation.
+ *
+ * Returns: string version of @kind
+ **/
+const gchar *
+btd_btrfs_action_to_string (BtdBtrfsAction kind)
+{
+    if (kind == BTD_BTRFS_ACTION_STATS)
+        return "stats";
+    if (kind == BTD_BTRFS_ACTION_SCRUB)
+        return "scrub";
+    if (kind == BTD_BTRFS_ACTION_BALANCE)
+        return "balance";
+    return "unknown";
+}
+
+/**
+ * btd_btrfs_action_from_string:
+ * @str: the string.
+ *
+ * Converts the text representation to an enumerated value.
+ *
+ * Returns: a #BtdBtrfsAction or %BTD_BTRFS_ACTION_UNKNOWN for unknown.
+ **/
+BtdBtrfsAction
+btd_btrfs_action_from_string (const gchar *str)
+{
+    if (btd_str_equal0 (str, "stats"))
+        return BTD_BTRFS_ACTION_STATS;
+    if (btd_str_equal0 (str, "scrub"))
+        return BTD_BTRFS_ACTION_SCRUB;
+    if (btd_str_equal0 (str, "balance"))
+        return BTD_BTRFS_ACTION_BALANCE;
+    return BTD_BTRFS_ACTION_UNKNOWN;
+}
+
 static void
 btd_mount_record_init (BtdMountRecord *self)
 {
@@ -125,6 +165,21 @@ btd_mount_record_new (const gchar *mountpoint)
     return BTD_MOUNT_RECORD (self);
 }
 
+static gchar *
+btd_mount_record_get_state_filename (BtdMountRecord *self)
+{
+    BtdMountRecordPrivate *priv = GET_PRIVATE (self);
+    g_autofree gchar *state_path = NULL;
+    g_autofree gchar *state_filename = NULL;
+    g_autofree gchar *btrfsd_state_dir = NULL;
+
+    state_filename = btd_path_to_filename (priv->mountpoint);
+    btrfsd_state_dir = btd_get_state_dir ();
+    state_path = g_strconcat (btrfsd_state_dir, "/", state_filename, ".state", NULL);
+
+    return g_steal_pointer (&state_path);
+}
+
 /**
  * btd_mount_record_load:
  * @self: An instance of #BtdMountRecord.
@@ -139,19 +194,33 @@ btd_mount_record_load (BtdMountRecord *self, GError **error)
 {
     BtdMountRecordPrivate *priv = GET_PRIVATE (self);
     g_autofree gchar *state_path = NULL;
-    g_autofree gchar *state_filename = NULL;
-    g_autofree gchar *btrfsd_state_dir = NULL;
 
-    state_filename = btd_path_to_filename (priv->mountpoint);
-    btrfsd_state_dir = btd_get_state_dir ();
-    state_path = g_strconcat (btrfsd_state_dir, "/", state_filename, ".state", NULL);
-
+    state_path = btd_mount_record_get_state_filename (self);
     if (g_file_test (state_path, G_FILE_TEST_EXISTS)) {
         if (!g_key_file_load_from_file (priv->state, state_path, G_KEY_FILE_NONE, error))
             return FALSE;
     }
 
     return TRUE;
+}
+
+/**
+ * btd_mount_record_save:
+ * @self: An instance of #BtdMountRecord.
+ * @error: A #GError
+ *
+ * Save mount record.
+ *
+ * Returns: %TRUE on success.
+ */
+gboolean
+btd_mount_record_save (BtdMountRecord *self, GError **error)
+{
+    BtdMountRecordPrivate *priv = GET_PRIVATE (self);
+    g_autofree gchar *state_path = NULL;
+
+    state_path = btd_mount_record_get_state_filename (self);
+    return g_key_file_save_to_file (priv->state, state_path, error);
 }
 
 /**
@@ -180,4 +249,38 @@ btd_mount_record_set_mountpoint (BtdMountRecord *self, const gchar *mount_path)
     BtdMountRecordPrivate *priv = GET_PRIVATE (self);
     g_free (priv->mountpoint);
     priv->mountpoint = g_strdup (mount_path);
+}
+
+/**
+ * btd_mount_record_get_last_action_time:
+ * @self: An instance of #BtdMountRecord.
+ * @action_kind: The %BtdBtrfsAction to check for.
+ *
+ * Returns: Last UNIX timestamp when the action was run, or 0 if never.
+ */
+gint64
+btd_mount_record_get_last_action_time (BtdMountRecord *self, BtdBtrfsAction action_kind)
+{
+    BtdMountRecordPrivate *priv = GET_PRIVATE (self);
+    return g_key_file_get_uint64 (priv->state,
+                                  "times",
+                                  btd_btrfs_action_to_string (action_kind),
+                                  NULL);
+}
+
+/**
+ * btd_mount_record_set_last_action_time_now:
+ * @self: An instance of #BtdMountRecord.
+ * @action_kind: The %BtdBtrfsAction.
+ *
+ * Set the last time the action was performed to now.
+ */
+void
+btd_mount_record_set_last_action_time_now (BtdMountRecord *self, BtdBtrfsAction action_kind)
+{
+    BtdMountRecordPrivate *priv = GET_PRIVATE (self);
+    g_key_file_set_uint64 (priv->state,
+                           "times",
+                           btd_btrfs_action_to_string (action_kind),
+                           (gint64) time (NULL));
 }

@@ -16,6 +16,7 @@
 
 #include "btd-utils.h"
 #include "btd-btrfs-mount.h"
+#include "btd-mount-record.h"
 
 typedef struct {
     gboolean loaded;
@@ -23,9 +24,7 @@ typedef struct {
     GKeyFile *config;
     gchar *state_dir;
 
-    gulong default_scub_interval;
-    gulong default_stats_interval;
-    gulong default_balance_interval;
+    gulong default_intervals[BTD_BTRFS_ACTION_LAST];
 } BtdSchedulerPrivate;
 
 G_DEFINE_TYPE_WITH_PRIVATE (BtdScheduler, btd_scheduler, G_TYPE_OBJECT)
@@ -35,9 +34,14 @@ static void
 btd_scheduler_init (BtdScheduler *self)
 {
     BtdSchedulerPrivate *priv = GET_PRIVATE (self);
+    gulong seconds_in_month;
 
     priv->config = g_key_file_new ();
     priv->state_dir = btd_get_state_dir ();
+
+    seconds_in_month = btd_parse_duration_string ("1M");
+    for (guint i = 0; i < BTD_BTRFS_ACTION_LAST; i++)
+        priv->default_intervals[i] = seconds_in_month;
 }
 
 static void
@@ -76,6 +80,12 @@ btd_scheduler_new ()
     return BTD_SCHEDULER (self);
 }
 
+static gchar *
+btd_get_interval_key (BtdBtrfsAction action_kind)
+{
+    return g_strconcat (btd_btrfs_action_to_string (action_kind), "_interval", NULL);
+}
+
 static gulong
 btd_scheduler_get_config_duration_str (BtdScheduler *self,
                                        const gchar *group,
@@ -104,6 +114,21 @@ btd_scheduler_get_config_duration (BtdScheduler *self,
     if (value == NULL)
         return default_value;
     return btd_parse_duration_string (value);
+}
+
+static gulong
+btd_scheduler_get_config_duration_for_action (BtdScheduler *self,
+                                              BtdBtrfsMount *bmount,
+                                              BtdBtrfsAction action_kind)
+{
+    BtdSchedulerPrivate *priv = GET_PRIVATE (self);
+    g_autofree gchar *key_name = NULL;
+
+    key_name = btd_get_interval_key (action_kind);
+    return btd_scheduler_get_config_duration (self,
+                                              btd_btrfs_mount_get_mountpoint (bmount),
+                                              key_name,
+                                              priv->default_intervals[action_kind]);
 }
 
 /**
@@ -143,18 +168,21 @@ btd_scheduler_load (BtdScheduler *self, GError **error)
         }
     }
 
-    priv->default_scub_interval = btd_scheduler_get_config_duration_str (self,
-                                                                         "default",
-                                                                         "ScrubInterval",
-                                                                         "1M");
-    priv->default_stats_interval = btd_scheduler_get_config_duration_str (self,
-                                                                          "default",
-                                                                          "StatsInterval",
-                                                                          "1h");
-    priv->default_balance_interval = btd_scheduler_get_config_duration_str (self,
-                                                                            "default",
-                                                                            "BalanceInterval",
-                                                                            "6M");
+    priv->default_intervals[BTD_BTRFS_ACTION_SCRUB] = btd_scheduler_get_config_duration_str (
+        self,
+        "default",
+        btd_get_interval_key (BTD_BTRFS_ACTION_SCRUB),
+        "1M");
+    priv->default_intervals[BTD_BTRFS_ACTION_STATS] = btd_scheduler_get_config_duration_str (
+        self,
+        "default",
+        btd_get_interval_key (BTD_BTRFS_ACTION_STATS),
+        "1h");
+    priv->default_intervals[BTD_BTRFS_ACTION_BALANCE] = btd_scheduler_get_config_duration_str (
+        self,
+        "default",
+        btd_get_interval_key (BTD_BTRFS_ACTION_BALANCE),
+        "6M");
 
     priv->loaded = TRUE;
     return TRUE;
@@ -169,8 +197,40 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount)
 static gboolean
 btd_scheduler_run_for_mount (BtdScheduler *self, BtdBtrfsMount *bmount)
 {
-    BtdSchedulerPrivate *priv = GET_PRIVATE (self);
+    g_autoptr(BtdMountRecord) record = NULL;
+    g_autoptr(GError) error = NULL;
+    gint64 current_time;
+    gint64 last_time;
+    gulong interval_time;
 
+    record = btd_mount_record_new (btd_btrfs_mount_get_mountpoint (bmount));
+    if (!btd_mount_record_load (record, &error)) {
+        g_warning ("Unable to load record for mount '%s': %s",
+                   btd_btrfs_mount_get_mountpoint (bmount),
+                   error->message);
+        g_clear_error (&error);
+    }
+
+    /* current time */
+    current_time = (gint64) time (NULL);
+
+    /* Stats Action */
+    interval_time = btd_scheduler_get_config_duration_for_action (self,
+                                                                  bmount,
+                                                                  BTD_BTRFS_ACTION_STATS);
+    last_time = btd_mount_record_get_last_action_time (record, BTD_BTRFS_ACTION_STATS);
+    if (current_time - last_time > interval_time) {
+        btd_scheduler_run_stats (self, bmount);
+        btd_mount_record_set_last_action_time_now (record, BTD_BTRFS_ACTION_STATS);
+    }
+
+    /* save record & finish */
+    if (!btd_mount_record_save (record, &error)) {
+        g_warning ("Unable to save state record for mount '%s': %s",
+                   btd_btrfs_mount_get_mountpoint (bmount),
+                   error->message);
+        g_clear_error (&error);
+    }
     return TRUE;
 }
 
