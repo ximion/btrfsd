@@ -188,11 +188,13 @@ btd_render_template (const gchar *template, const gchar *key1, ...)
         gboolean replaced = FALSE;
 
         for (guint j = 0; j < vars->len; j += 2) {
+            g_autofree gchar *tmp2 = NULL;
             g_autofree gchar *tmp = g_strconcat (g_ptr_array_index (vars, j), "}}", NULL);
             if (!g_str_has_prefix (parts[i], tmp))
                 continue;
 
             /* replace string */
+            tmp2 = parts[i];
             parts[i] = parts[i] + strlen (tmp);
             parts[i] = g_strconcat (g_ptr_array_index (vars, j + 1), parts[i], NULL);
             replaced = TRUE;
