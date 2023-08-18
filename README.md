@@ -1,4 +1,5 @@
 # Btrfsd - Tiny Btrfs maintenance daemon
+[![Build Test](https://github.com/ximion/btrfsd/actions/workflows/build-test.yml/badge.svg)](https://github.com/ximion/btrfsd/actions/workflows/build-test.yml)
 
 Btrfsd is a lightweight daemon that takes care of all Btrfs filesystems on a Linux system.
 It will periodically:
