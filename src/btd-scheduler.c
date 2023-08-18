@@ -347,7 +347,7 @@ btd_scheduler_run_for_mount (BtdScheduler *self, BtdBtrfsMount *bmount)
 {
     g_autoptr(BtdMountRecord) record = NULL;
     g_autoptr(GError) error = NULL;
-    time_t current_time;
+    gint64 current_time;
     gint64 last_time;
     gulong interval_time;
     struct {
@@ -371,7 +371,7 @@ btd_scheduler_run_for_mount (BtdScheduler *self, BtdBtrfsMount *bmount)
     }
 
     /* current time */
-    current_time = time (NULL);
+    current_time = (gint64)time (NULL);
 
     /* run all actions */
     for (guint i = 0; action_fn[i].func != NULL; i++) {
@@ -379,7 +379,7 @@ btd_scheduler_run_for_mount (BtdScheduler *self, BtdBtrfsMount *bmount)
                                                                       bmount,
                                                                       action_fn[i].action);
         last_time = btd_mount_record_get_last_action_time (record, action_fn[i].action);
-        if (current_time - last_time > interval_time) {
+        if (current_time - last_time > (gint64)interval_time) {
             /* first check if this action is even allowed to be run if we are on batter power */
             if (!action_fn[i].allow_on_battery && btd_machine_is_on_battery ()) {
                 g_debug ("Skipping %s on %s, we are running on battery power.",

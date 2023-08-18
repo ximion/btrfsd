@@ -7,3 +7,8 @@ option('maintainer',
        value : false,
        description : 'Enable maintainer mode (use strict compiler flags, e.g. -Werror)'
 )
+option('static-analysis',
+       type : 'boolean',
+       value : false,
+       description : 'Enable GCC static analysis support'
+)

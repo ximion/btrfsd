@@ -45,6 +45,20 @@ conf.set('_DEFAULT_SOURCE', true)
 configure_file(output: 'config.h', configuration: conf)
 root_inc_dir = include_directories ('.')
 
+if get_option('static-analysis') and host_machine.system() != 'windows'
+  if cc.get_id() != 'gcc'
+    error('You need to compile with GCC to run the static analyzer!')
+  endif
+
+  # enable statuc analyzer
+  add_project_arguments(['-fanalyzer'], language : 'c')
+
+  # make false-positive non-fatal with GCC 12 for now
+  if cc.version().version_compare('>11<13')
+    add_project_arguments(['-Wno-error=analyzer-use-of-uninitialized-value'], language : 'c')
+  endif
+endif
+
 #
 # Custom C flags
 #
