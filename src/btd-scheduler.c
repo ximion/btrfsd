@@ -258,7 +258,6 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount, BtdMountReco
         g_autoptr(GDateTime) dt_now = g_date_time_new_now_local ();
 
         current_time = time (NULL);
-
         if (current_time - btd_mount_record_get_value_int (record, "mails", "issue_mail_sent", 0) <
             SECONDS_IN_A_DAY) {
             g_debug ("Issue email for '%s' already sent today, will try again tomorrow if the "
@@ -304,6 +303,29 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount, BtdMountReco
 }
 
 static gboolean
+btd_scheduler_run_scrub (BtdScheduler *self, BtdBtrfsMount *bmount, BtdMountRecord *record)
+{
+    g_autoptr(GError) error = NULL;
+
+    g_debug ("Running scrub on filesystem %s", btd_btrfs_mount_get_mountpoint (bmount));
+    if (!btd_btrfs_mount_scrub (bmount, &error)) {
+        g_warning ("Scrub on %s failed: %s",
+                   btd_btrfs_mount_get_mountpoint (bmount),
+                   error->message);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static gboolean
+btd_scheduler_run_balance (BtdScheduler *self, BtdBtrfsMount *bmount, BtdMountRecord *record)
+{
+    /* TODO */
+    return TRUE;
+}
+
+static gboolean
 btd_scheduler_run_for_mount (BtdScheduler *self, BtdBtrfsMount *bmount)
 {
     g_autoptr(BtdMountRecord) record = NULL;
@@ -316,6 +338,8 @@ btd_scheduler_run_for_mount (BtdScheduler *self, BtdBtrfsMount *bmount)
         BtdActionFunction func;
     } action_fn[] = {
         { BTD_BTRFS_ACTION_STATS, btd_scheduler_run_stats },
+        { BTD_BTRFS_ACTION_SCRUB, btd_scheduler_run_scrub },
+        { BTD_BTRFS_ACTION_BALANCE, btd_scheduler_run_balance },
 
         { BTD_BTRFS_ACTION_UNKNOWN, NULL },
     };
