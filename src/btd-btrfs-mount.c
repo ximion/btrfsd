@@ -327,6 +327,9 @@ btd_parse_btrfs_device_stats (JsonArray *array, gboolean *errors_found)
     g_string_append (intro_text, "\n");
     g_string_prepend (issues_text, intro_text->str);
 
+    /* drop trailing newlines */
+    g_string_truncate (issues_text, issues_text->len - 2);
+
     return g_string_free (g_steal_pointer (&issues_text), FALSE);
 }
 

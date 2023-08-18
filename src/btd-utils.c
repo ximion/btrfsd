@@ -82,7 +82,7 @@ gchar *
 btd_get_state_dir (void)
 {
     gchar *path = g_build_filename (SHAREDSTATEDIR, "btrfsd", NULL);
-    g_mkdir_with_parents (path, 0644);
+    g_mkdir_with_parents (path, 0755);
     return path;
 }
 
@@ -101,6 +101,19 @@ btd_get_resource_data (const gchar *resource_path)
                                    resource_path,
                                    G_RESOURCE_LOOKUP_FLAGS_NONE,
                                    NULL);
+}
+
+/**
+ * btd_user_is_root:
+ *
+ * Check if the current user has superuser permissions.
+ */
+gboolean
+btd_user_is_root (void)
+{
+    uid_t vuid;
+    vuid = getuid ();
+    return (vuid == ((uid_t) 0));
 }
 
 /**

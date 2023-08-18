@@ -228,6 +228,7 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount, BtdMountReco
     g_autofree gchar *issue_report = NULL;
     gboolean errors_found = FALSE;
     g_autoptr(GError) error = NULL;
+    time_t current_time;
 
     g_debug ("Reading stats for %s", btd_btrfs_mount_get_mountpoint (bmount));
 
@@ -244,8 +245,25 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount, BtdMountReco
     if (!errors_found)
         return TRUE;
 
+    current_time = time (NULL);
+
+    if (current_time - btd_mount_record_get_value_int (record, "messages", "broadcast_sent", 0) >
+        SECONDS_IN_AN_HOUR * 6) {
+        g_autofree gchar *bc_message = NULL;
+        /* broadcast message that there are errors to be fixed, do that roughly every 6h */
+        bc_message = g_strdup_printf ("⚠ Errors detected on filesystem at %s!\n"
+                                      "Please back up your files immediately. You can run "
+                                      "`btrfs device stats %s` for issue details.\n",
+                                      btd_btrfs_mount_get_mountpoint (bmount),
+                                      btd_btrfs_mount_get_mountpoint (bmount));
+
+        btd_broadcast_message (bc_message);
+        btd_mount_record_set_value_int (record, "messages", "broadcast_sent", current_time);
+    }
+
     if (mail_address == NULL) {
-        g_print ("Errors detected on filesystem '%s'!\n", btd_btrfs_mount_get_mountpoint (bmount));
+        g_printerr ("Errors detected on filesystem '%s'!\n",
+                    btd_btrfs_mount_get_mountpoint (bmount));
         return TRUE;
     }
 
@@ -254,11 +272,10 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount, BtdMountReco
         g_autofree gchar *formatted_time = NULL;
         g_autofree gchar *mail_body = NULL;
         g_autofree gchar *fs_usage = NULL;
-        time_t current_time;
         g_autoptr(GDateTime) dt_now = g_date_time_new_now_local ();
 
-        current_time = time (NULL);
-        if (current_time - btd_mount_record_get_value_int (record, "mails", "issue_mail_sent", 0) <
+        if (current_time -
+                btd_mount_record_get_value_int (record, "messages", "issue_mail_sent", 0) <
             SECONDS_IN_A_DAY) {
             g_debug ("Issue email for '%s' already sent today, will try again tomorrow if the "
                      "issue persists.",
@@ -296,7 +313,7 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount, BtdMountReco
         }
 
         /* we have sent the mail, record that fact so we don't spam messages too frequently */
-        btd_mount_record_set_value_int (record, "mails", "issue_mail_sent", current_time);
+        btd_mount_record_set_value_int (record, "messages", "issue_mail_sent", current_time);
     }
 
     return TRUE;
@@ -405,6 +422,15 @@ btd_scheduler_run (BtdScheduler *self, GError **error)
     if (!priv->loaded) {
         if (!btd_scheduler_load (self, error))
             return FALSE;
+    }
+
+    /* we need to be root for the next steps */
+    if (!btd_user_is_root ()) {
+        g_set_error_literal (error,
+                             BTD_BTRFS_ERROR,
+                             BTD_BTRFS_ERROR_FAILED,
+                             "Need to be root to run this daemon.");
+        return FALSE;
     }
 
     /* check if there is anything for us to do */

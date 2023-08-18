@@ -225,8 +225,11 @@ btd_mount_record_load (BtdMountRecord *self, GError **error)
         priv->is_new = TRUE;
 
         /* the file did not exist yet, so we cheat and assume all jobs recently ran, so we don't run every job immediately */
-        for (guint j = BTD_BTRFS_ACTION_UNKNOWN + 1; j < BTD_BTRFS_ACTION_LAST; j++)
-            btd_mount_record_set_last_action_time_now (self, j);
+        for (guint j = BTD_BTRFS_ACTION_UNKNOWN + 1; j < BTD_BTRFS_ACTION_LAST; j++) {
+            /* running "stats" immediately is fine, the more expensive actions should wait */
+            if (j != BTD_BTRFS_ACTION_STATS)
+                btd_mount_record_set_last_action_time_now (self, j);
+        }
     }
 
     return TRUE;

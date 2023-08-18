@@ -17,6 +17,8 @@
 #include <glib.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <utmp.h>
+#include <fcntl.h>
 
 /**
  * btd_mail_error_quark:
@@ -106,4 +108,38 @@ btd_send_email (const gchar *to_address, const gchar *body, GError **error)
     }
 
     return TRUE;
+}
+
+/**
+ * btd_broadcast_message:
+ * @message: The message to send.
+ *
+ * Broadcast a message to all users, like `wall` does.
+ */
+void
+btd_broadcast_message (const gchar *message)
+{
+    struct utmp *utmp_entry;
+    gint fd;
+
+    /* open the utmp file */
+    setutent ();
+
+    /* read each entry from the utmp file */
+    while ((utmp_entry = getutent ()) != NULL) {
+        /* check if the entry is a user process */
+        if (utmp_entry->ut_type == USER_PROCESS) {
+            /* open the terminal device */
+            g_autofree gchar *term_path = g_strconcat ("/dev/", utmp_entry->ut_line, NULL);
+            fd = open (term_path, O_WRONLY);
+            if (fd != -1) {
+                /* write the message to the terminal */
+                write (fd, message, strlen (message));
+                close (fd);
+            }
+        }
+    }
+
+    /* close the utmp file */
+    endutent ();
 }

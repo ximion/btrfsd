@@ -28,4 +28,6 @@ GQuark   btd_mail_error_quark (void);
 gboolean btd_have_sendmail (void);
 gboolean btd_send_email (const gchar *to_address, const gchar *body, GError **error);
 
+void     btd_broadcast_message (const gchar *message);
+
 G_END_DECLS
