@@ -69,16 +69,77 @@ test_path_escape (void)
     g_free (tmp);
 
     tmp = btd_path_to_filename ("/this/is/a path with/spaces/.txt");
-    g_assert_cmpstr (tmp, ==, "this-is-a path with-spaces-.txt");
+    g_assert_cmpstr (tmp, ==, "this-is-a path with-spaces-.txt_4128569403");
     g_free (tmp);
 
     tmp = btd_path_to_filename ("..");
-    g_assert_cmpstr (tmp, ==, "_..");
+    g_assert_cmpstr (tmp, ==, "-");
     g_free (tmp);
 
-    tmp = btd_path_to_filename ("/a/cräzü/path----/../txt");
-    g_assert_cmpstr (tmp, ==, "a-cräzü-path-----..-txt");
+    tmp = btd_path_to_filename ("/../../.");
+    g_assert_cmpstr (tmp, ==, "-");
     g_free (tmp);
+
+    tmp = btd_path_to_filename ("/a/cräzü/path----/x/../txt");
+    g_assert_cmpstr (tmp, ==, "a-cräzü-path-----txt_3474729208");
+    g_free (tmp);
+
+    tmp = btd_path_to_filename ("/a-b/c");
+    g_assert_cmpstr (tmp, ==, "a-b-c_2088179606");
+    g_free (tmp);
+
+    tmp = btd_path_to_filename ("/a/b/c");
+    g_assert_cmpstr (tmp, ==, "a-b-c_2088251480");
+    g_free (tmp);
+}
+
+/**
+ * test_humanize_time:
+ */
+static void
+test_humanize_time (void)
+{
+    g_autofree gchar *result = NULL;
+
+    result = btd_humanize_time (5);
+    g_assert_cmpstr (result, ==, "5 seconds");
+    g_clear_pointer (&result, g_free);
+
+    result = btd_humanize_time (1);
+    g_assert_cmpstr (result, ==, "1 second");
+    g_clear_pointer (&result, g_free);
+
+    result = btd_humanize_time (70);
+    g_assert_cmpstr (result, ==, "1 minute 10 seconds");
+    g_clear_pointer (&result, g_free);
+
+    result = btd_humanize_time (120);
+    g_assert_cmpstr (result, ==, "2 minutes");
+    g_clear_pointer (&result, g_free);
+
+    result = btd_humanize_time (3600);
+    g_assert_cmpstr (result, ==, "1 hour");
+    g_clear_pointer (&result, g_free);
+
+    result = btd_humanize_time (3660);
+    g_assert_cmpstr (result, ==, "1 hour 1 minute");
+    g_clear_pointer (&result, g_free);
+
+    result = btd_humanize_time (SECONDS_IN_A_DAY);
+    g_assert_cmpstr (result, ==, "1 day");
+    g_clear_pointer (&result, g_free);
+
+    result = btd_humanize_time (SECONDS_IN_A_DAY + SECONDS_IN_AN_HOUR);
+    g_assert_cmpstr (result, ==, "1 day 1 hour");
+    g_clear_pointer (&result, g_free);
+
+    result = btd_humanize_time (SECONDS_IN_A_MONTH);
+    g_assert_cmpstr (result, ==, "1 month");
+    g_clear_pointer (&result, g_free);
+
+    result = btd_humanize_time (SECONDS_IN_A_MONTH + SECONDS_IN_A_DAY);
+    g_assert_cmpstr (result, ==, "1 month 1 day");
+    g_clear_pointer (&result, g_free);
 }
 
 int
@@ -100,6 +161,7 @@ main (int argc, char **argv)
     g_test_add_func ("/Btrfsd/Misc/DurationParser", test_duration_parser);
     g_test_add_func ("/Btrfsd/Misc/RenderTemplate", test_render_template);
     g_test_add_func ("/Btrfsd/Misc/PathEscape", test_path_escape);
+    g_test_add_func ("/Btrfsd/Misc/HumanizeTime", test_humanize_time);
 
     ret = g_test_run ();
     return ret;

@@ -29,4 +29,6 @@ gboolean      btd_scheduler_load (BtdScheduler *self, GError **error);
 
 gboolean      btd_scheduler_run (BtdScheduler *self, GError **error);
 
+gboolean      btd_scheduler_print_status (BtdScheduler *self);
+
 G_END_DECLS

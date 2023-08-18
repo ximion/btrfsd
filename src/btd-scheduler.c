@@ -411,3 +411,72 @@ btd_scheduler_run (BtdScheduler *self, GError **error)
 
     return TRUE;
 }
+
+/**
+ * btd_scheduler_print_status:
+ * @self: An instance of #BtdScheduler
+ *
+ * Print scheduler status data to stdout.
+ *
+ * Returns: %TRUE if all data was gathered and no issues were found.
+ */
+gboolean
+btd_scheduler_print_status (BtdScheduler *self)
+{
+    BtdSchedulerPrivate *priv = GET_PRIVATE (self);
+    g_autoptr(GError) error = NULL;
+    gboolean errors_found = FALSE;
+
+    if (priv->mountpoints->len == 0) {
+        g_print ("No mounted Btrfs filesystems found.\n");
+        return TRUE;
+    }
+
+    for (guint i = 0; i < priv->mountpoints->len; i++) {
+        BtdBtrfsMount *bmount = g_ptr_array_index (priv->mountpoints, i);
+
+        g_print ("%c[%dm%s  →  %s%c[%dm\n",
+                 0x1B,
+                 1,
+                 btd_btrfs_mount_get_mountpoint (bmount),
+                 btd_btrfs_mount_get_device_name (bmount),
+                 0x1B,
+                 0);
+
+        for (guint j = BTD_BTRFS_ACTION_UNKNOWN + 1; j < BTD_BTRFS_ACTION_LAST; j++) {
+            g_autoptr(BtdMountRecord) record = NULL;
+            g_autofree gchar *last_action_time_str = NULL;
+            gint64 last_action_timestamp;
+            g_autofree gchar *interval_time = btd_humanize_time (
+                (gint64) btd_scheduler_get_config_duration_for_action (self, bmount, j));
+            g_print ("  • %s\n"
+                     "    Runs every %s\n",
+                     btd_btrfs_action_to_human_string (j),
+                     interval_time);
+
+            record = btd_mount_record_new (btd_btrfs_mount_get_mountpoint (bmount));
+            if (!btd_mount_record_load (record, &error)) {
+                g_warning ("Unable to load record for mount '%s': %s",
+                           btd_btrfs_mount_get_mountpoint (bmount),
+                           error->message);
+                g_clear_error (&error);
+                errors_found = TRUE;
+                continue;
+            }
+
+            last_action_timestamp = btd_mount_record_get_last_action_time (record, j);
+            if (last_action_timestamp == 0 || btd_mount_record_is_new (record)) {
+                last_action_time_str = g_strdup ("Never");
+            } else {
+                g_autoptr(GDateTime) last_action_dt = NULL;
+                last_action_dt = g_date_time_new_from_unix_local (last_action_timestamp);
+                last_action_time_str = g_date_time_format (last_action_dt, "%Y-%m-%d %H:%M:%S");
+            }
+            g_print ("    Last run: %s\n", last_action_time_str);
+        }
+
+        g_print ("\n");
+    }
+
+    return !errors_found;
+}

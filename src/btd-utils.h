@@ -35,4 +35,6 @@ gchar   *btd_render_template (const gchar *template, const gchar *key1, ...) G_G
 
 gchar   *btd_path_to_filename (const gchar *path);
 
+gchar   *btd_humanize_time (gint64 seconds);
+
 G_END_DECLS

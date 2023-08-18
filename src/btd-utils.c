@@ -236,20 +236,98 @@ gchar *
 btd_path_to_filename (const gchar *path)
 {
     GString *str;
+    guint short_hash;
+    g_autofree gchar *canonical_path = NULL;
 
-    str = g_string_new (path);
+    canonical_path = g_canonicalize_filename (path, "/");
+    str = g_string_new (canonical_path);
+    short_hash = g_str_hash (canonical_path);
+
     if (g_str_has_prefix (str->str, "/"))
         g_string_erase (str, 0, 1);
-    if (g_str_has_prefix (str->str, "."))
-        g_string_prepend_c (str, '_');
     if (str->len == 0) {
         /* we hit the root path / */
         g_string_free (str, TRUE);
         return g_strdup ("-");
     }
+    if (g_str_has_prefix (str->str, "."))
+        g_string_prepend_c (str, '_');
 
     g_string_replace (str, "/", "-", 0);
     g_string_replace (str, "\\", "-", 0);
 
+    /* append the hash value to the filename, for some extra uniqueness for corner cases */
+    g_string_append_printf (str, "_%u", short_hash);
+
     return g_string_free (str, FALSE);
+}
+
+/**
+ * btd_humanize_time:
+ * @seconds: The time in seconds.
+ *
+ * Convert a time in seconds into a human-readable string.
+ *
+ * Returns: (transfer full): The human-readable string containing the time.
+ */
+gchar *
+btd_humanize_time (gint64 seconds)
+{
+    if (seconds < 60)
+        return g_strdup_printf ("%" G_GINT64_FORMAT " %s",
+                                seconds,
+                                seconds == 1 ? "second" : "seconds");
+
+    if (seconds < SECONDS_IN_AN_HOUR) {
+        if (seconds % 60 == 0)
+            return g_strdup_printf ("%" G_GINT64_FORMAT " %s",
+                                    seconds / 60,
+                                    (seconds / 60) == 1 ? "minute" : "minutes");
+        else
+            return g_strdup_printf ("%" G_GINT64_FORMAT " %s %" G_GINT64_FORMAT " %s",
+                                    seconds / 60,
+                                    (seconds / 60) == 1 ? "minute" : "minutes",
+                                    seconds % 60,
+                                    (seconds % 60) == 1 ? "second" : "seconds");
+    }
+
+    if (seconds < SECONDS_IN_A_DAY) {
+        if ((seconds % SECONDS_IN_AN_HOUR) / 60 == 0)
+            return g_strdup_printf ("%" G_GINT64_FORMAT " %s",
+                                    seconds / SECONDS_IN_AN_HOUR,
+                                    (seconds / SECONDS_IN_AN_HOUR) == 1 ? "hour" : "hours");
+        else
+            return g_strdup_printf ("%" G_GINT64_FORMAT " %s %" G_GINT64_FORMAT " %s",
+                                    seconds / SECONDS_IN_AN_HOUR,
+                                    (seconds / SECONDS_IN_AN_HOUR) == 1 ? "hour" : "hours",
+                                    (seconds % SECONDS_IN_AN_HOUR) / 60,
+                                    ((seconds % SECONDS_IN_AN_HOUR) / 60) == 1 ? "minute"
+                                                                               : "minutes");
+    }
+
+    if (seconds < SECONDS_IN_A_MONTH) {
+        if ((seconds % SECONDS_IN_A_DAY) / SECONDS_IN_AN_HOUR == 0)
+            return g_strdup_printf ("%" G_GINT64_FORMAT " %s",
+                                    seconds / SECONDS_IN_A_DAY,
+                                    (seconds / SECONDS_IN_A_DAY) == 1 ? "day" : "days");
+        else
+            return g_strdup_printf (
+                "%" G_GINT64_FORMAT " %s %" G_GINT64_FORMAT " %s",
+                seconds / SECONDS_IN_A_DAY,
+                (seconds / SECONDS_IN_A_DAY) == 1 ? "day" : "days",
+                (seconds % SECONDS_IN_A_DAY) / SECONDS_IN_AN_HOUR,
+                ((seconds % SECONDS_IN_A_DAY) / SECONDS_IN_AN_HOUR) == 1 ? "hour" : "hours");
+    }
+
+    if ((seconds % SECONDS_IN_A_MONTH) / SECONDS_IN_A_DAY == 0)
+        return g_strdup_printf ("%" G_GINT64_FORMAT " %s",
+                                seconds / SECONDS_IN_A_MONTH,
+                                (seconds / SECONDS_IN_A_MONTH) == 1 ? "month" : "months");
+    else
+        return g_strdup_printf ("%" G_GINT64_FORMAT " %s %" G_GINT64_FORMAT " %s",
+                                seconds / SECONDS_IN_A_MONTH,
+                                (seconds / SECONDS_IN_A_MONTH) == 1 ? "month" : "months",
+                                (seconds % SECONDS_IN_A_MONTH) / SECONDS_IN_A_DAY,
+                                ((seconds % SECONDS_IN_A_MONTH) / SECONDS_IN_A_DAY) == 1 ? "day"
+                                                                                         : "days");
 }

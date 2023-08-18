@@ -44,11 +44,13 @@ typedef enum {
 
 const gchar    *btd_btrfs_action_to_string (BtdBtrfsAction kind);
 BtdBtrfsAction  btd_btrfs_action_from_string (const gchar *str);
+const gchar    *btd_btrfs_action_to_human_string (BtdBtrfsAction kind);
 
 BtdMountRecord *btd_mount_record_new (const gchar *mountpoint);
 
 gboolean        btd_mount_record_load (BtdMountRecord *self, GError **error);
 gboolean        btd_mount_record_save (BtdMountRecord *self, GError **error);
+gboolean        btd_mount_record_is_new (BtdMountRecord *self);
 
 const gchar    *btd_mount_record_get_mountpoint (BtdMountRecord *self);
 void            btd_mount_record_set_mountpoint (BtdMountRecord *self, const gchar *mount_path);

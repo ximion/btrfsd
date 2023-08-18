@@ -13,39 +13,6 @@
 #include "btd-scheduler.h"
 #include "btd-btrfs-mount.h"
 
-/**
- * btd_show_status:
- *
- * Display some status information as console output.
- */
-static gint
-btd_show_status (void)
-{
-    g_autoptr(GPtrArray) mountpoints = NULL;
-    g_autoptr(GError) error = NULL;
-
-    mountpoints = btd_find_mounted_btrfs_filesystems (&error);
-    if (mountpoints == NULL) {
-        g_printerr ("Unable to find mounted Btrfs filesystems: %s\n", error->message);
-        return EXIT_FAILURE;
-    }
-
-    if (mountpoints->len == 0) {
-        g_print ("No mounted Btrfs filesystems found.\n");
-        return EXIT_SUCCESS;
-    }
-
-    g_print ("Mounted Btrfs filesystems:\n");
-    for (guint i = 0; i < mountpoints->len; i++) {
-        BtdBtrfsMount *bmount = g_ptr_array_index (mountpoints, i);
-        g_print ("  • %s  →  %s\n",
-                 btd_btrfs_mount_get_mountpoint (bmount),
-                 btd_btrfs_mount_get_device_name (bmount));
-    }
-
-    return EXIT_SUCCESS;
-}
-
 int
 main (int argc, char **argv)
 {
@@ -105,7 +72,15 @@ main (int argc, char **argv)
 
     if (show_status) {
         /* display status information */
-        return btd_show_status ();
+        if (btd_scheduler_print_status (scheduler))
+            return EXIT_SUCCESS;
+        return EXIT_FAILURE;
+    }
+
+    /* run all scheduled actions */
+    if (!btd_scheduler_run (scheduler, &error)) {
+        g_printerr ("Failed to run: %s\n", error->message);
+        return EXIT_FAILURE;
     }
 
     return EXIT_SUCCESS;

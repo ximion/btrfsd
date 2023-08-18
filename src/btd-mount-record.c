@@ -19,6 +19,8 @@
 typedef struct {
     gchar *mountpoint;
     GKeyFile *state;
+
+    gboolean is_new;
 } BtdMountRecordPrivate;
 
 enum {
@@ -38,7 +40,7 @@ G_DEFINE_TYPE_WITH_PRIVATE (BtdMountRecord, btd_mount_record, G_TYPE_OBJECT)
  * btd_btrfs_action_to_string:
  * @kind: the %BtdBtrfsAction.
  *
- * Converts the enumerated value to an text representation.
+ * Converts the enumerated value to a text representation.
  *
  * Returns: string version of @kind
  **/
@@ -74,6 +76,26 @@ btd_btrfs_action_from_string (const gchar *str)
     return BTD_BTRFS_ACTION_UNKNOWN;
 }
 
+/**
+ * btd_btrfs_action_to_human_string:
+ * @kind: the %BtdBtrfsAction.
+ *
+ * Converts the enumerated value to a human-readable text representation.
+ *
+ * Returns: string version of @kind
+ **/
+const gchar *
+btd_btrfs_action_to_human_string (BtdBtrfsAction kind)
+{
+    if (kind == BTD_BTRFS_ACTION_STATS)
+        return "Check for Issues";
+    if (kind == BTD_BTRFS_ACTION_SCRUB)
+        return "Scrub Filesystem";
+    if (kind == BTD_BTRFS_ACTION_BALANCE)
+        return "Balance Filesystem";
+    return "Unknown Action";
+}
+
 static void
 btd_mount_record_init (BtdMountRecord *self)
 {
@@ -89,7 +111,7 @@ btd_mount_record_finalize (GObject *object)
     BtdMountRecordPrivate *priv = GET_PRIVATE (bmount);
 
     g_free (priv->mountpoint);
-    g_object_unref (priv->state);
+    g_key_file_unref (priv->state);
 
     G_OBJECT_CLASS (btd_mount_record_parent_class)->finalize (object);
 }
@@ -199,6 +221,12 @@ btd_mount_record_load (BtdMountRecord *self, GError **error)
     if (g_file_test (state_path, G_FILE_TEST_EXISTS)) {
         if (!g_key_file_load_from_file (priv->state, state_path, G_KEY_FILE_NONE, error))
             return FALSE;
+    } else {
+        priv->is_new = TRUE;
+
+        /* the file did not exist yet, so we cheat and assume all jobs recently ran, so we don't run every job immediately */
+        for (guint j = BTD_BTRFS_ACTION_UNKNOWN + 1; j < BTD_BTRFS_ACTION_LAST; j++)
+            btd_mount_record_set_last_action_time_now (self, j);
     }
 
     return TRUE;
@@ -221,6 +249,21 @@ btd_mount_record_save (BtdMountRecord *self, GError **error)
 
     state_path = btd_mount_record_get_state_filename (self);
     return g_key_file_save_to_file (priv->state, state_path, error);
+}
+
+/**
+ * btd_mount_record_is_new:
+ * @self: An instance of #BtdMountRecord.
+ *
+ * Check if the record file was just created.
+ *
+ * returns: %TRUE if the state record is new.
+ */
+gboolean
+btd_mount_record_is_new (BtdMountRecord *self)
+{
+    BtdMountRecordPrivate *priv = GET_PRIVATE (self);
+    return priv->is_new;
 }
 
 /**
@@ -262,10 +305,10 @@ gint64
 btd_mount_record_get_last_action_time (BtdMountRecord *self, BtdBtrfsAction action_kind)
 {
     BtdMountRecordPrivate *priv = GET_PRIVATE (self);
-    return g_key_file_get_uint64 (priv->state,
-                                  "times",
-                                  btd_btrfs_action_to_string (action_kind),
-                                  NULL);
+    return g_key_file_get_int64 (priv->state,
+                                 "times",
+                                 btd_btrfs_action_to_string (action_kind),
+                                 NULL);
 }
 
 /**
