@@ -31,7 +31,7 @@ typedef struct {
 G_DEFINE_TYPE_WITH_PRIVATE (BtdScheduler, btd_scheduler, G_TYPE_OBJECT)
 #define GET_PRIVATE(o) (btd_scheduler_get_instance_private (o))
 
-typedef gboolean (*BtdActionFunction) (BtdScheduler *, BtdBtrfsMount *);
+typedef gboolean (*BtdActionFunction) (BtdScheduler *, BtdBtrfsMount *, BtdMountRecord *);
 
 static void
 btd_scheduler_init (BtdScheduler *self)
@@ -222,7 +222,7 @@ btd_scheduler_load (BtdScheduler *self, GError **error)
 }
 
 static gboolean
-btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount)
+btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount, BtdMountRecord *record)
 {
     g_autofree gchar *mail_address = NULL;
     g_autofree gchar *issue_report = NULL;
@@ -254,9 +254,20 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount)
         g_autofree gchar *formatted_time = NULL;
         g_autofree gchar *mail_body = NULL;
         g_autofree gchar *fs_usage = NULL;
-        g_autoptr(GDateTime) now = g_date_time_new_now_local ();
+        time_t current_time;
+        g_autoptr(GDateTime) dt_now = g_date_time_new_now_local ();
 
-        formatted_time = g_date_time_format (now, "%Y-%m-%d %H:%M:%S");
+        current_time = time (NULL);
+
+        if (current_time - btd_mount_record_get_value_int (record, "mails", "issue_mail_sent", 0) <
+            SECONDS_IN_A_DAY) {
+            g_debug ("Issue email for '%s' already sent today, will try again tomorrow if the "
+                     "issue persists.",
+                     btd_btrfs_mount_get_mountpoint (bmount));
+            return TRUE;
+        }
+
+        formatted_time = g_date_time_format (dt_now, "%Y-%m-%d %H:%M:%S");
 
         template_bytes = btd_get_resource_data ("/btrfsd/error-mail.tmpl");
         if (template_bytes == NULL) {
@@ -284,6 +295,9 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount)
             g_warning ("Failed to send issue mail: %s", error->message);
             return FALSE;
         }
+
+        /* we have sent the mail, record that fact so we don't spam messages too frequently */
+        btd_mount_record_set_value_int (record, "mails", "issue_mail_sent", current_time);
     }
 
     return TRUE;
@@ -294,7 +308,7 @@ btd_scheduler_run_for_mount (BtdScheduler *self, BtdBtrfsMount *bmount)
 {
     g_autoptr(BtdMountRecord) record = NULL;
     g_autoptr(GError) error = NULL;
-    gint64 current_time;
+    time_t current_time;
     gint64 last_time;
     gulong interval_time;
     struct {
@@ -315,7 +329,7 @@ btd_scheduler_run_for_mount (BtdScheduler *self, BtdBtrfsMount *bmount)
     }
 
     /* current time */
-    current_time = (gint64) time (NULL);
+    current_time = time (NULL);
 
     /* run all actions */
     for (guint i = 0; action_fn[i].func != NULL; i++) {
@@ -324,7 +338,7 @@ btd_scheduler_run_for_mount (BtdScheduler *self, BtdBtrfsMount *bmount)
                                                                       action_fn[i].action);
         last_time = btd_mount_record_get_last_action_time (record, action_fn[i].action);
         if (current_time - last_time > interval_time) {
-            action_fn[i].func (self, bmount);
+            action_fn[i].func (self, bmount, record);
             btd_mount_record_set_last_action_time_now (record, action_fn[i].action);
         }
     }

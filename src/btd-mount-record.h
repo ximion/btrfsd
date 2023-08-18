@@ -56,4 +56,13 @@ void            btd_mount_record_set_mountpoint (BtdMountRecord *self, const gch
 gint64 btd_mount_record_get_last_action_time (BtdMountRecord *self, BtdBtrfsAction action_kind);
 void   btd_mount_record_set_last_action_time_now (BtdMountRecord *self, BtdBtrfsAction action_kind);
 
+gint64 btd_mount_record_get_value_int (BtdMountRecord *self,
+                                       const gchar    *group_name,
+                                       const gchar    *key,
+                                       gint64          default_value);
+void   btd_mount_record_set_value_int (BtdMountRecord *self,
+                                       const gchar    *group_name,
+                                       const gchar    *key,
+                                       gint64          value);
+
 G_END_DECLS

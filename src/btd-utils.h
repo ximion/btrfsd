@@ -10,6 +10,12 @@
 
 G_BEGIN_DECLS
 
+#define SECONDS_IN_AN_HOUR (60 * 60)
+#define SECONDS_IN_A_DAY   (24 * SECONDS_IN_AN_HOUR)
+#define SECONDS_IN_A_WEEK  (7 * SECONDS_IN_A_DAY)
+/* we assume an average month has approximately 30.44 days here */
+#define SECONDS_IN_A_MONTH ((int) (30.44 * SECONDS_IN_A_DAY))
+
 /**
  * btd_str_equal0:
  * Returns TRUE if strings are equal, ignoring NULL strings.

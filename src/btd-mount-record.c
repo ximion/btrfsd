@@ -284,3 +284,47 @@ btd_mount_record_set_last_action_time_now (BtdMountRecord *self, BtdBtrfsAction 
                            btd_btrfs_action_to_string (action_kind),
                            (gint64) time (NULL));
 }
+
+/**
+ * btd_mount_record_get_value_int:
+ * @self: An instance of #BtdMountRecord.
+ * @group_name: The group.
+ * @key: The key to look at.
+ * @default_value: A default value.
+ *
+ * Returns: The selected value.
+ */
+gint64
+btd_mount_record_get_value_int (BtdMountRecord *self,
+                                const gchar *group_name,
+                                const gchar *key,
+                                gint64 default_value)
+{
+    BtdMountRecordPrivate *priv = GET_PRIVATE (self);
+    gint64 value;
+    g_autoptr(GError) error = NULL;
+
+    value = g_key_file_get_int64 (priv->state, group_name, key, &error);
+    if (error != NULL)
+        return default_value;
+    return value;
+}
+
+/**
+ * btd_mount_record_get_value_int:
+ * @self: An instance of #BtdMountRecord.
+ * @group_name: The group.
+ * @key: The key to look at.
+ * @default_value: A default value.
+ *
+ * Set en integer value in the state record.
+ */
+void
+btd_mount_record_set_value_int (BtdMountRecord *self,
+                                const gchar *group_name,
+                                const gchar *key,
+                                gint64 value)
+{
+    BtdMountRecordPrivate *priv = GET_PRIVATE (self);
+    g_key_file_set_uint64 (priv->state, group_name, key, value);
+}
