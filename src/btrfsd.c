@@ -59,14 +59,20 @@ main (int argc, char **argv)
 
     const GOptionEntry options[] = {
         { "verbose",
-         'v', 0,
-         G_OPTION_ARG_NONE, &verbose,
-         "Show extra debugging information", NULL },
+          'v',
+          0,
+          G_OPTION_ARG_NONE,
+          &verbose,
+          "Show extra debugging information",
+          NULL },
         { "version", '\0', 0, G_OPTION_ARG_NONE, &show_version, "Show the program version.", NULL },
         { "status",
-         '\0', 0,
-         G_OPTION_ARG_NONE, &show_status,
-         "Display some short status information.", NULL },
+          '\0',
+          0,
+          G_OPTION_ARG_NONE,
+          &show_status,
+          "Display some short status information.",
+          NULL },
         { NULL }
     };
 

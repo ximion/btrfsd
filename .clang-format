@@ -24,9 +24,6 @@ AlignOperands: true
 # align trailing comments
 AlignTrailingComments: true
 
-# left-align array of structures
-AlignArrayOfStructures: Left
-
 # don't allow putting all parameters of a function/declaration onto the next line
 AllowAllArgumentsOnNextLine: false
 AllowAllParametersOfDeclarationOnNextLine: false

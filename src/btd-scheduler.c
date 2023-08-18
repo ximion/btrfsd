@@ -301,9 +301,9 @@ btd_scheduler_run_for_mount (BtdScheduler *self, BtdBtrfsMount *bmount)
         BtdBtrfsAction action;
         BtdActionFunction func;
     } action_fn[] = {
-        {BTD_BTRFS_ACTION_STATS,    btd_scheduler_run_stats},
+        { BTD_BTRFS_ACTION_STATS, btd_scheduler_run_stats },
 
-        { BTD_BTRFS_ACTION_UNKNOWN, NULL                   },
+        { BTD_BTRFS_ACTION_UNKNOWN, NULL },
     };
 
     record = btd_mount_record_new (btd_btrfs_mount_get_mountpoint (bmount));
