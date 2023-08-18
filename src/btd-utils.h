@@ -37,4 +37,6 @@ gchar   *btd_path_to_filename (const gchar *path);
 
 gchar   *btd_humanize_time (gint64 seconds);
 
+gboolean btd_machine_is_on_battery (void);
+
 G_END_DECLS

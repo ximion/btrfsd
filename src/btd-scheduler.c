@@ -336,10 +336,11 @@ btd_scheduler_run_for_mount (BtdScheduler *self, BtdBtrfsMount *bmount)
     struct {
         BtdBtrfsAction action;
         BtdActionFunction func;
+        gboolean allow_on_battery;
     } action_fn[] = {
-        { BTD_BTRFS_ACTION_STATS, btd_scheduler_run_stats },
-        { BTD_BTRFS_ACTION_SCRUB, btd_scheduler_run_scrub },
-        { BTD_BTRFS_ACTION_BALANCE, btd_scheduler_run_balance },
+        { BTD_BTRFS_ACTION_STATS, btd_scheduler_run_stats, TRUE },
+        { BTD_BTRFS_ACTION_SCRUB, btd_scheduler_run_scrub, FALSE },
+        { BTD_BTRFS_ACTION_BALANCE, btd_scheduler_run_balance, FALSE },
 
         { BTD_BTRFS_ACTION_UNKNOWN, NULL },
     };
@@ -362,8 +363,17 @@ btd_scheduler_run_for_mount (BtdScheduler *self, BtdBtrfsMount *bmount)
                                                                       action_fn[i].action);
         last_time = btd_mount_record_get_last_action_time (record, action_fn[i].action);
         if (current_time - last_time > interval_time) {
-            action_fn[i].func (self, bmount, record);
-            btd_mount_record_set_last_action_time_now (record, action_fn[i].action);
+            /* first check if this action is even allowed to be run if we are on batter power */
+            if (!action_fn[i].allow_on_battery && btd_machine_is_on_battery ()) {
+                g_debug ("Skipping %s on %s, we are running on battery power.",
+                         btd_btrfs_action_to_string (action_fn[i].action),
+                         btd_btrfs_mount_get_mountpoint (bmount));
+                continue;
+            }
+
+            /* run the action and record that we ran it, if it didn't fail to be launched */
+            if (action_fn[i].func (self, bmount, record))
+                btd_mount_record_set_last_action_time_now (record, action_fn[i].action);
         }
     }
 
@@ -432,6 +442,9 @@ btd_scheduler_print_status (BtdScheduler *self)
         return TRUE;
     }
 
+    g_print ("Running on battery: %s\n", btd_machine_is_on_battery () ? "yes" : "no");
+
+    g_print ("Status:\n");
     for (guint i = 0; i < priv->mountpoints->len; i++) {
         BtdBtrfsMount *bmount = g_ptr_array_index (priv->mountpoints, i);
 

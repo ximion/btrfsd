@@ -42,7 +42,7 @@ btd_have_sendmail (void)
  * btd_send_email:
  * @to_address: Address to send the mail to.
  * @body: The message body, including the subject line
- * @error: Error if mail could not be sent.
+ * @error: A #GError.
  *
  * Send any E-Mail via sendmail.
  *

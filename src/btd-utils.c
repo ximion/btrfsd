@@ -331,3 +331,68 @@ btd_humanize_time (gint64 seconds)
                                 ((seconds % SECONDS_IN_A_MONTH) / SECONDS_IN_A_DAY) == 1 ? "day"
                                                                                          : "days");
 }
+
+/**
+ * btd_machine_is_on_battery:
+ *
+ * Check if the system is currently running on battery power.
+ * We will ask UPower first, and fall back to reading data from /sys
+ * if that fails.
+ *
+ * Returns: %TRUE if system is on battery.
+ */
+gboolean
+btd_machine_is_on_battery ()
+{
+    g_autoptr(GDBusConnection) connection = NULL;
+    g_autoptr(GVariant) result = NULL;
+    g_autoptr(GError) dbus_error = NULL;
+    guint32 state;
+
+    connection = g_bus_get_sync (G_BUS_TYPE_SYSTEM, NULL, &dbus_error);
+    if (connection != NULL) {
+        result = g_dbus_connection_call_sync (
+            connection,
+            "org.freedesktop.UPower",
+            "/org/freedesktop/UPower/devices/battery_BAT0",
+            "org.freedesktop.DBus.Properties",
+            "Get",
+            g_variant_new ("(ss)", "org.freedesktop.UPower.Device", "State"),
+            G_VARIANT_TYPE ("(v)"),
+            G_DBUS_CALL_FLAGS_NONE,
+            -1,
+            NULL,
+            &dbus_error);
+    }
+
+    if (result == NULL) {
+        g_autofree gchar *contents = NULL;
+        g_autoptr(GError) file_error = NULL;
+
+        /* we failed to red battery information from UPower - let's try using /sys directly */
+        if (!g_file_get_contents ("/sys/class/power_supply/BAT0/status",
+                                  &contents,
+                                  NULL,
+                                  &file_error)) {
+            g_debug ("Unable to read battery status (UPower failed: %s, Reading BAT0 failed: %s). "
+                     "The system may not have a battery.",
+                     dbus_error->message,
+                     file_error->message);
+            /* this is not an error, the machine may not have a battery */
+            return FALSE;
+        }
+
+        /* we're on battery if we're discharging */
+        return g_str_has_prefix (g_strstrip (contents), "Discharging");
+    }
+
+    /* extract battery state from D-Bus result */
+    g_variant_get (result, "(v)", &result);
+    state = g_variant_get_uint32 (result);
+
+    g_variant_unref (result);
+    g_object_unref (connection);
+
+    /* 2 is the value for "discharging" in upower */
+    return state == 2;
+}
