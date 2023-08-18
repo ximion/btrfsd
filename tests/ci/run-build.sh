@@ -16,8 +16,7 @@ build_dir="cibuild"
 sanitize_flag=""
 if [ "$1" = "sanitize" ]; then
     build_dir="cibuild-san"
-    # FIXME: Build withour GIR, as g-ir-scanner hangs endlessly when using asan
-    sanitize_flags="-Db_sanitize=address,undefined -Dgir=false"
+    sanitize_flags="-Db_sanitize=address,undefined"
     build_type=debug
     echo "Running build with sanitizers 'address,undefined' enabled."
     # Slow unwind, but we get better backtraces
