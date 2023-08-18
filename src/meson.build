@@ -6,12 +6,14 @@ btrfsd_src = [
     'btd-mount-record.c',
     'btd-scheduler.h',
     'btd-scheduler.c',
+    'btd-mailer.h',
+    'btd-mailer.c',
     'btd-utils.h',
     'btd-utils.c',
 ]
 
 btrfsd_res = glib.compile_resources (
-    'btrfsd-resources', 'btrfsd.gresource.xml',
+    'btd-resources', 'btrfsd.gresource.xml',
     c_name: 'btd',
     source_dir: ['../data']
 )

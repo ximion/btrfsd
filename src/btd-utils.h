@@ -21,6 +21,7 @@ gboolean btd_is_empty (const gchar *str);
 gchar   *btd_strstripnl (gchar *string);
 
 gchar   *btd_get_state_dir (void);
+GBytes  *btd_get_resource_data (const gchar *resource_path);
 
 gulong   btd_parse_duration_string (const gchar *str);
 

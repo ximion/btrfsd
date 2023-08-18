@@ -14,6 +14,8 @@
 #include "config.h"
 #include "btd-utils.h"
 
+#include "btd-resources.h"
+
 #define SECONDS_IN_AN_HOUR (60 * 60)
 #define SECONDS_IN_A_DAY   (24 * SECONDS_IN_AN_HOUR)
 #define SECONDS_IN_A_WEEK  (7 * SECONDS_IN_A_DAY)
@@ -88,6 +90,23 @@ btd_get_state_dir (void)
     gchar *path = g_build_filename (SHAREDSTATEDIR, "btrfsd", NULL);
     g_mkdir_with_parents (path, 0644);
     return path;
+}
+
+/**
+ * btd_get_resource_data:
+ * @resource_path: Path to the resource.
+ *
+ * Load data from an internal resource.
+ *
+ * returns: The resource bytes, or %NULL on error.
+ **/
+GBytes *
+btd_get_resource_data (const gchar *resource_path)
+{
+    return g_resource_lookup_data (btd_get_resource (),
+                                   resource_path,
+                                   G_RESOURCE_LOOKUP_FLAGS_NONE,
+                                   NULL);
 }
 
 /**

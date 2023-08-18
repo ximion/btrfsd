@@ -223,6 +223,51 @@ btd_btrfs_mount_get_mountpoint (BtdBtrfsMount *self)
     return priv->mountpoint;
 }
 
+/**
+ * btd_btrfs_mount_read_usage:
+ * @self: An instance of #BtdBtrfsMount.
+ * @error: A #GError
+ *
+ * Read filesystem usage information (btrfs fi df).
+ *
+ * Returns: The Btrfs usage report.
+ */
+gchar *
+btd_btrfs_mount_read_usage (BtdBtrfsMount *self, GError **error)
+{
+    BtdBtrfsMountPrivate *priv = GET_PRIVATE (self);
+    GError *tmp_error = NULL;
+    gint btrfs_exit_code;
+    g_autofree gchar *df_output = NULL;
+    g_autofree gchar *stderr_output = NULL;
+
+    gchar *command[] = { BTRFS_CMD, "fi", "df", priv->mountpoint, NULL };
+    if (!g_spawn_sync (NULL, /* working directory */
+                       command,
+                       NULL, /* envp */
+                       G_SPAWN_DEFAULT,
+                       NULL,
+                       NULL,
+                       &df_output,
+                       &stderr_output,
+                       &btrfs_exit_code,
+                       &tmp_error)) {
+        g_propagate_prefixed_error (error, tmp_error, "Failed to execute btrfs fi df command:");
+        return FALSE;
+    }
+
+    if (btrfs_exit_code != 0) {
+        g_set_error (error,
+                     BTD_BTRFS_ERROR,
+                     BTD_BTRFS_ERROR_FAILED,
+                     "Running btrfs fi df has failed: %s",
+                     btd_strstripnl (stderr_output));
+        return FALSE;
+    }
+
+    return btd_strstripnl (g_steal_pointer (&df_output));
+}
+
 static gchar *
 btd_parse_btrfs_device_stats (JsonArray *array, gboolean *errors_found)
 {

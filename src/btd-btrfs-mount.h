@@ -50,6 +50,8 @@ BtdBtrfsMount *btd_btrfs_mount_new (const gchar *device, const gchar *mountpoint
 const gchar   *btd_btrfs_mount_get_device_name (BtdBtrfsMount *self);
 const gchar   *btd_btrfs_mount_get_mountpoint (BtdBtrfsMount *self);
 
+gchar         *btd_btrfs_mount_read_usage (BtdBtrfsMount *self, GError **error);
+
 gboolean       btd_btrfs_mount_read_error_stats (BtdBtrfsMount *self,
                                                  gchar        **report,
                                                  gboolean      *errors_found,

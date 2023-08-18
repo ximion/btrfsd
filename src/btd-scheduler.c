@@ -15,6 +15,7 @@
 #include "btd-scheduler.h"
 
 #include "btd-utils.h"
+#include "btd-mailer.h"
 #include "btd-btrfs-mount.h"
 #include "btd-mount-record.h"
 
@@ -29,6 +30,8 @@ typedef struct {
 
 G_DEFINE_TYPE_WITH_PRIVATE (BtdScheduler, btd_scheduler, G_TYPE_OBJECT)
 #define GET_PRIVATE(o) (btd_scheduler_get_instance_private (o))
+
+typedef gboolean (*BtdActionFunction) (BtdScheduler *, BtdBtrfsMount *);
 
 static void
 btd_scheduler_init (BtdScheduler *self)
@@ -131,6 +134,36 @@ btd_scheduler_get_config_duration_for_action (BtdScheduler *self,
                                               priv->default_intervals[action_kind]);
 }
 
+static gchar *
+btd_scheduler_get_config_value (BtdScheduler *self,
+                                BtdBtrfsMount *bmount,
+                                const gchar *key,
+                                const gchar *default_value)
+{
+    BtdSchedulerPrivate *priv = GET_PRIVATE (self);
+    g_autofree gchar *value = NULL;
+
+    if (bmount == NULL) {
+        value = g_key_file_get_string (priv->config, "general", key, NULL);
+        if (value == NULL)
+            return g_strdup (default_value);
+        return value;
+    }
+
+    value = g_key_file_get_string (priv->config,
+                                   btd_btrfs_mount_get_mountpoint (bmount),
+                                   key,
+                                   NULL);
+    if (value == NULL) {
+        /* check generic section */
+        value = g_key_file_get_string (priv->config, "general", key, NULL);
+    }
+
+    if (value == NULL)
+        return g_strdup (default_value);
+    return value;
+}
+
 /**
  * btd_scheduler_load:
  * @self: An instance of #BtdScheduler
@@ -191,6 +224,68 @@ btd_scheduler_load (BtdScheduler *self, GError **error)
 static gboolean
 btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount)
 {
+    g_autofree gchar *mail_address = NULL;
+    g_autofree gchar *issue_report = NULL;
+    gboolean errors_found = FALSE;
+    g_autoptr(GError) error = NULL;
+
+    g_debug ("Reading stats for %s", btd_btrfs_mount_get_mountpoint (bmount));
+
+    mail_address = btd_scheduler_get_config_value (self, bmount, "mail_address", NULL);
+    if (!btd_btrfs_mount_read_error_stats (bmount, &issue_report, &errors_found, &error)) {
+        /* only log the error for now */
+        g_printerr ("Failed to query btrfs issue statistics for '%s': %s\n",
+                    btd_btrfs_mount_get_mountpoint (bmount),
+                    error->message);
+        return FALSE;
+    }
+
+    /* we have nothing more to do if no errors were found */
+    if (!errors_found)
+        return TRUE;
+
+    if (mail_address == NULL) {
+        g_print ("Errors detected on filesystem '%s'!\n", btd_btrfs_mount_get_mountpoint (bmount));
+        return TRUE;
+    }
+
+    {
+        g_autoptr(GBytes) template_bytes = NULL;
+        g_autofree gchar *formatted_time = NULL;
+        g_autofree gchar *mail_body = NULL;
+        g_autofree gchar *fs_usage = NULL;
+        g_autoptr(GDateTime) now = g_date_time_new_now_local ();
+
+        formatted_time = g_date_time_format (now, "%Y-%m-%d %H:%M:%S");
+
+        template_bytes = btd_get_resource_data ("/btrfsd/error-mail.tmpl");
+        if (template_bytes == NULL) {
+            g_critical ("Failed to find error-mail template data. This is a bug.");
+            return FALSE;
+        }
+
+        fs_usage = btd_btrfs_mount_read_usage (bmount, NULL);
+        if (fs_usage == NULL)
+            fs_usage = g_strdup ("⚠ Failed to read usage data.");
+        mail_body = btd_render_template (g_bytes_get_data (template_bytes, NULL),
+                                         "date_time",
+                                         formatted_time,
+                                         "hostname",
+                                         g_get_host_name (),
+                                         "mountpoint",
+                                         btd_btrfs_mount_get_mountpoint (bmount),
+                                         "issue_report",
+                                         issue_report,
+                                         "fs_usage",
+                                         fs_usage,
+                                         NULL);
+
+        if (!btd_send_email (mail_address, mail_body, &error)) {
+            g_warning ("Failed to send issue mail: %s", error->message);
+            return FALSE;
+        }
+    }
+
     return TRUE;
 }
 
@@ -202,6 +297,14 @@ btd_scheduler_run_for_mount (BtdScheduler *self, BtdBtrfsMount *bmount)
     gint64 current_time;
     gint64 last_time;
     gulong interval_time;
+    struct {
+        BtdBtrfsAction action;
+        BtdActionFunction func;
+    } action_fn[] = {
+        {BTD_BTRFS_ACTION_STATS,    btd_scheduler_run_stats},
+
+        { BTD_BTRFS_ACTION_UNKNOWN, NULL                   },
+    };
 
     record = btd_mount_record_new (btd_btrfs_mount_get_mountpoint (bmount));
     if (!btd_mount_record_load (record, &error)) {
@@ -214,14 +317,16 @@ btd_scheduler_run_for_mount (BtdScheduler *self, BtdBtrfsMount *bmount)
     /* current time */
     current_time = (gint64) time (NULL);
 
-    /* Stats Action */
-    interval_time = btd_scheduler_get_config_duration_for_action (self,
-                                                                  bmount,
-                                                                  BTD_BTRFS_ACTION_STATS);
-    last_time = btd_mount_record_get_last_action_time (record, BTD_BTRFS_ACTION_STATS);
-    if (current_time - last_time > interval_time) {
-        btd_scheduler_run_stats (self, bmount);
-        btd_mount_record_set_last_action_time_now (record, BTD_BTRFS_ACTION_STATS);
+    /* run all actions */
+    for (guint i = 0; action_fn[i].func != NULL; i++) {
+        interval_time = btd_scheduler_get_config_duration_for_action (self,
+                                                                      bmount,
+                                                                      action_fn[i].action);
+        last_time = btd_mount_record_get_last_action_time (record, action_fn[i].action);
+        if (current_time - last_time > interval_time) {
+            action_fn[i].func (self, bmount);
+            btd_mount_record_set_last_action_time_now (record, action_fn[i].action);
+        }
     }
 
     /* save record & finish */
