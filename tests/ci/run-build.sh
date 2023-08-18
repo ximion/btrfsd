@@ -9,11 +9,20 @@ set -e
 #
 
 . /etc/os-release
-static_analysis=false
 
+maintainer_mode=true
+static_analysis=false
 build_type=debugoptimized
 build_dir="cibuild"
 sanitize_flag=""
+
+
+if [ "$ID" = "ubuntu" ] && [ "$VERSION_CODENAME" = "jammy" ]; then
+    # we don't make warnings fatal on Ubuntu 22.04
+    maintainer_mode=false
+fi;
+
+
 if [ "$1" = "sanitize" ]; then
     build_dir="cibuild-san"
     sanitize_flags="-Db_sanitize=address,undefined"
@@ -41,7 +50,7 @@ $CC --version
 mkdir $build_dir && cd $build_dir
 meson --buildtype=$build_type \
       $sanitize_flags \
-      -Dmaintainer=true \
+      -Dmaintainer=$maintainer_mode \
       -Dstatic-analysis=$static_analysis \
       ..
 
