@@ -81,7 +81,7 @@ btd_strstripnl (gchar *string)
 gchar *
 btd_get_state_dir (void)
 {
-    gchar *path = g_build_filename (SHAREDSTATEDIR, "btrfsd", NULL);
+    gchar *path = g_build_filename (LOCALSTATEDIR, "lib", "btrfsd", NULL);
     g_mkdir_with_parents (path, 0755);
     return path;
 }
