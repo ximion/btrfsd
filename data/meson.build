@@ -10,7 +10,18 @@ bdsd_service = configure_file(
     configuration: bdsd_data
 )
 
-install_data(bdsd_service,
-             install_dir: systemd_unit_dir)
-install_data('btrfsd.timer',
-             install_dir: systemd_unit_dir)
+install_data(
+    bdsd_service,
+    install_dir: systemd_unit_dir
+)
+install_data(
+    'btrfsd.timer',
+    install_dir: systemd_unit_dir
+)
+
+
+# Install example configuration file
+install_data(
+    'settings.conf',
+    install_dir: get_option('sysconfdir')
+)

@@ -92,7 +92,7 @@ btd_send_email (const gchar *to_address, const gchar *body, GError **error)
     }
 
     /* write email content to stdin of sendmail */
-    (void)write (stdin_fd, email_content, strlen (email_content));
+    (void) write (stdin_fd, email_content, strlen (email_content));
     close (stdin_fd);
 
     g_spawn_close_pid (child_pid);
@@ -134,7 +134,7 @@ btd_broadcast_message (const gchar *message)
             fd = open (term_path, O_WRONLY);
             if (fd != -1) {
                 /* write the message to the terminal */
-                (void)write (fd, message, strlen (message));
+                (void) write (fd, message, strlen (message));
                 close (fd);
             }
         }
