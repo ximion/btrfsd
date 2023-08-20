@@ -222,6 +222,65 @@ btd_scheduler_load (BtdScheduler *self, GError **error)
 }
 
 static gboolean
+btd_scheduler_send_error_mail (BtdScheduler *self,
+                               BtdBtrfsMount *bmount,
+                               BtdMountRecord *record,
+                               const gchar *mail_address,
+                               const gchar *issue_report)
+{
+    g_autoptr(GBytes) template_bytes = NULL;
+    g_autofree gchar *formatted_time = NULL;
+    g_autofree gchar *mail_body = NULL;
+    g_autofree gchar *fs_usage = NULL;
+    g_autoptr(GError) error = NULL;
+    g_autoptr(GDateTime) dt_now = g_date_time_new_now_local ();
+    time_t current_time;
+
+    current_time = time (NULL);
+    if (current_time - btd_mount_record_get_value_int (record, "messages", "issue_mail_sent", 0) <
+        SECONDS_IN_AN_HOUR * 14) {
+        g_debug ("Issue email for '%s' already sent today, will try again in 14h if the "
+                 "issue persists.",
+                 btd_btrfs_mount_get_mountpoint (bmount));
+        return TRUE;
+    }
+
+    formatted_time = g_date_time_format (dt_now, "%Y-%m-%d %H:%M:%S");
+
+    template_bytes = btd_get_resource_data ("/btrfsd/error-mail.tmpl");
+    if (template_bytes == NULL) {
+        g_critical ("Failed to find error-mail template data. This is a bug.");
+        return FALSE;
+    }
+
+    fs_usage = btd_btrfs_mount_read_usage (bmount, NULL);
+    if (fs_usage == NULL)
+        fs_usage = g_strdup ("⚠ Failed to read usage data.");
+    mail_body = btd_render_template (g_bytes_get_data (template_bytes, NULL),
+                                     "date_time",
+                                     formatted_time,
+                                     "hostname",
+                                     g_get_host_name (),
+                                     "mountpoint",
+                                     btd_btrfs_mount_get_mountpoint (bmount),
+                                     "issue_report",
+                                     issue_report,
+                                     "fs_usage",
+                                     fs_usage,
+                                     NULL);
+
+    if (!btd_send_email (mail_address, mail_body, &error)) {
+        g_warning ("Failed to send issue mail: %s", error->message);
+        return FALSE;
+    }
+
+    /* we have sent the mail, record that fact so we don't spam messages too frequently */
+    btd_mount_record_set_value_int (record, "messages", "issue_mail_sent", current_time);
+
+    return TRUE;
+}
+
+static gboolean
 btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount, BtdMountRecord *record)
 {
     g_autofree gchar *mail_address = NULL;
@@ -267,56 +326,7 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount, BtdMountReco
         return TRUE;
     }
 
-    {
-        g_autoptr(GBytes) template_bytes = NULL;
-        g_autofree gchar *formatted_time = NULL;
-        g_autofree gchar *mail_body = NULL;
-        g_autofree gchar *fs_usage = NULL;
-        g_autoptr(GDateTime) dt_now = g_date_time_new_now_local ();
-
-        if (current_time -
-                btd_mount_record_get_value_int (record, "messages", "issue_mail_sent", 0) <
-            SECONDS_IN_A_DAY) {
-            g_debug ("Issue email for '%s' already sent today, will try again tomorrow if the "
-                     "issue persists.",
-                     btd_btrfs_mount_get_mountpoint (bmount));
-            return TRUE;
-        }
-
-        formatted_time = g_date_time_format (dt_now, "%Y-%m-%d %H:%M:%S");
-
-        template_bytes = btd_get_resource_data ("/btrfsd/error-mail.tmpl");
-        if (template_bytes == NULL) {
-            g_critical ("Failed to find error-mail template data. This is a bug.");
-            return FALSE;
-        }
-
-        fs_usage = btd_btrfs_mount_read_usage (bmount, NULL);
-        if (fs_usage == NULL)
-            fs_usage = g_strdup ("⚠ Failed to read usage data.");
-        mail_body = btd_render_template (g_bytes_get_data (template_bytes, NULL),
-                                         "date_time",
-                                         formatted_time,
-                                         "hostname",
-                                         g_get_host_name (),
-                                         "mountpoint",
-                                         btd_btrfs_mount_get_mountpoint (bmount),
-                                         "issue_report",
-                                         issue_report,
-                                         "fs_usage",
-                                         fs_usage,
-                                         NULL);
-
-        if (!btd_send_email (mail_address, mail_body, &error)) {
-            g_warning ("Failed to send issue mail: %s", error->message);
-            return FALSE;
-        }
-
-        /* we have sent the mail, record that fact so we don't spam messages too frequently */
-        btd_mount_record_set_value_int (record, "messages", "issue_mail_sent", current_time);
-    }
-
-    return TRUE;
+    return btd_scheduler_send_error_mail (self, bmount, record, mail_address, issue_report);
 }
 
 static gboolean
