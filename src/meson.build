@@ -1,9 +1,9 @@
 
 btrfsd_src = [
-    'btd-btrfs-mount.h',
-    'btd-btrfs-mount.c',
-    'btd-mount-record.h',
-    'btd-mount-record.c',
+    'btd-filesystem.h',
+    'btd-filesystem.c',
+    'btd-fs-record.h',
+    'btd-fs-record.c',
     'btd-mailer.h',
     'btd-mailer.c',
     'btd-scheduler.h',

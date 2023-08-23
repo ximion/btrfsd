@@ -29,10 +29,10 @@ typedef enum {
 #define BTD_BTRFS_ERROR btd_btrfs_error_quark ()
 GQuark btd_btrfs_error_quark (void);
 
-#define BTD_TYPE_BTRFS_MOUNT (btd_btrfs_mount_get_type ())
-G_DECLARE_DERIVABLE_TYPE (BtdBtrfsMount, btd_btrfs_mount, BTD, BTRFS_MOUNT, GObject)
+#define BTD_TYPE_FILESYSTEM (btd_filesystem_get_type ())
+G_DECLARE_DERIVABLE_TYPE (BtdFilesystem, btd_filesystem, BTD, FILESYSTEM, GObject)
 
-struct _BtdBtrfsMountClass {
+struct _BtdFilesystemClass {
     GObjectClass parent_class;
     /*< private >*/
     void (*_as_reserved1) (void);
@@ -45,18 +45,18 @@ struct _BtdBtrfsMountClass {
 
 GPtrArray     *btd_find_mounted_btrfs_filesystems (GError **error);
 
-BtdBtrfsMount *btd_btrfs_mount_new (const gchar *device, const gchar *mountpoint);
+BtdFilesystem *btd_filesystem_new (const gchar *device, const gchar *mountpoint);
 
-const gchar   *btd_btrfs_mount_get_device_name (BtdBtrfsMount *self);
-const gchar   *btd_btrfs_mount_get_mountpoint (BtdBtrfsMount *self);
+const gchar   *btd_filesystem_get_device_name (BtdFilesystem *self);
+const gchar   *btd_filesystem_get_mountpoint (BtdFilesystem *self);
 
-gchar         *btd_btrfs_mount_read_usage (BtdBtrfsMount *self, GError **error);
+gchar         *btd_filesystem_read_usage (BtdFilesystem *self, GError **error);
 
-gboolean       btd_btrfs_mount_read_error_stats (BtdBtrfsMount *self,
-                                                 gchar        **report,
-                                                 guint64       *errors_count,
-                                                 GError       **error);
+gboolean       btd_filesystem_read_error_stats (BtdFilesystem *self,
+                                                gchar        **report,
+                                                guint64       *errors_count,
+                                                GError       **error);
 
-gboolean       btd_btrfs_mount_scrub (BtdBtrfsMount *self, GError **error);
+gboolean       btd_filesystem_scrub (BtdFilesystem *self, GError **error);
 
 G_END_DECLS

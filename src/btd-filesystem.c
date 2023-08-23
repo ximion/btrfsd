@@ -5,15 +5,15 @@
  */
 
 /**
- * SECTION:btd-btrfs-mount
- * @short_description: An active Btrfs mountpoint on the system that can be acted on.
+ * SECTION:btd-filesystem
+ * @short_description: An active Btrfs mountpoint on the system.
  *
  * Defines an active Btrfs mountpoint on the current system, and can perform
  * various actions on it.
  */
 
 #include "config.h"
-#include "btd-btrfs-mount.h"
+#include "btd-filesystem.h"
 
 #include <libmount/libmount.h>
 #include <json-glib/json-glib.h>
@@ -23,7 +23,7 @@
 typedef struct {
     gchar *device_name;
     gchar *mountpoint;
-} BtdBtrfsMountPrivate;
+} BtdFilesystemPrivate;
 
 enum {
     PROP_0,
@@ -36,8 +36,8 @@ static GParamSpec *obj_properties[N_PROPERTIES] = {
     NULL,
 };
 
-G_DEFINE_TYPE_WITH_PRIVATE (BtdBtrfsMount, btd_btrfs_mount, G_TYPE_OBJECT)
-#define GET_PRIVATE(o) (btd_btrfs_mount_get_instance_private (o))
+G_DEFINE_TYPE_WITH_PRIVATE (BtdFilesystem, btd_filesystem, G_TYPE_OBJECT)
+#define GET_PRIVATE(o) (btd_filesystem_get_instance_private (o))
 
 /**
  * btd_btrfs_error_quark:
@@ -51,7 +51,7 @@ G_DEFINE_QUARK (btd-btrfs-error-quark, btd_btrfs_error)
  *
  * Find all mounted Btrfs filesystems on the current system.
  *
- * Returns: (transfer container) (element-type BtdBtrfsMount): mounted Btrfs filesystems
+ * Returns: (transfer container) (element-type BtdFilesystem): mounted Btrfs filesystems
  */
 GPtrArray *
 btd_find_mounted_btrfs_filesystems (GError **error)
@@ -74,8 +74,8 @@ btd_find_mounted_btrfs_filesystems (GError **error)
     result = g_ptr_array_new_with_free_func (g_object_unref);
     while (mnt_table_next_fs (table, iter, &fs) == 0) {
         if (g_strcmp0 (mnt_fs_get_fstype (fs), "btrfs") == 0) {
-            BtdBtrfsMount *bmount = btd_btrfs_mount_new (mnt_fs_get_source (fs),
-                                                         mnt_fs_get_target (fs));
+            BtdFilesystem *bmount = btd_filesystem_new (mnt_fs_get_source (fs),
+                                                        mnt_fs_get_target (fs));
             g_ptr_array_add (result, bmount);
         }
     }
@@ -88,33 +88,33 @@ out:
 }
 
 static void
-btd_btrfs_mount_init (BtdBtrfsMount *self)
+btd_filesystem_init (BtdFilesystem *self)
 {
-    BtdBtrfsMountPrivate *priv = GET_PRIVATE (self);
+    BtdFilesystemPrivate *priv = GET_PRIVATE (self);
 
     priv->device_name = NULL;
 }
 
 static void
-btd_btrfs_mount_finalize (GObject *object)
+btd_filesystem_finalize (GObject *object)
 {
-    BtdBtrfsMount *bmount = BTD_BTRFS_MOUNT (object);
-    BtdBtrfsMountPrivate *priv = GET_PRIVATE (bmount);
+    BtdFilesystem *bmount = BTD_FILESYSTEM (object);
+    BtdFilesystemPrivate *priv = GET_PRIVATE (bmount);
 
     g_free (priv->device_name);
     g_free (priv->mountpoint);
 
-    G_OBJECT_CLASS (btd_btrfs_mount_parent_class)->finalize (object);
+    G_OBJECT_CLASS (btd_filesystem_parent_class)->finalize (object);
 }
 
 static void
-btd_btrfs_mount_set_property (GObject *object,
-                              guint property_id,
-                              const GValue *value,
-                              GParamSpec *pspec)
+btd_filesystem_set_property (GObject *object,
+                             guint property_id,
+                             const GValue *value,
+                             GParamSpec *pspec)
 {
-    BtdBtrfsMount *self = BTD_BTRFS_MOUNT (object);
-    BtdBtrfsMountPrivate *priv = GET_PRIVATE (self);
+    BtdFilesystem *self = BTD_FILESYSTEM (object);
+    BtdFilesystemPrivate *priv = GET_PRIVATE (self);
 
     switch (property_id) {
     case PROP_DEVICE_NAME:
@@ -134,10 +134,10 @@ btd_btrfs_mount_set_property (GObject *object,
 }
 
 static void
-btd_btrfs_mount_get_property (GObject *object, guint property_id, GValue *value, GParamSpec *pspec)
+btd_filesystem_get_property (GObject *object, guint property_id, GValue *value, GParamSpec *pspec)
 {
-    BtdBtrfsMount *self = BTD_BTRFS_MOUNT (object);
-    BtdBtrfsMountPrivate *priv = GET_PRIVATE (self);
+    BtdFilesystem *self = BTD_FILESYSTEM (object);
+    BtdFilesystemPrivate *priv = GET_PRIVATE (self);
 
     switch (property_id) {
     case PROP_DEVICE_NAME:
@@ -153,12 +153,12 @@ btd_btrfs_mount_get_property (GObject *object, guint property_id, GValue *value,
 }
 
 static void
-btd_btrfs_mount_class_init (BtdBtrfsMountClass *klass)
+btd_filesystem_class_init (BtdFilesystemClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
-    object_class->finalize = btd_btrfs_mount_finalize;
-    object_class->set_property = btd_btrfs_mount_set_property;
-    object_class->get_property = btd_btrfs_mount_get_property;
+    object_class->finalize = btd_filesystem_finalize;
+    object_class->set_property = btd_filesystem_set_property;
+    object_class->get_property = btd_filesystem_get_property;
 
     obj_properties[PROP_DEVICE_NAME] = g_param_spec_string ("device_name",
                                                             "DeviceName",
@@ -178,54 +178,54 @@ btd_btrfs_mount_class_init (BtdBtrfsMountClass *klass)
 }
 
 /**
- * btd_btrfs_mount_new:
+ * btd_filesystem_new:
  *
- * Creates a new #BtdBtrfsMount.
+ * Creates a new #BtdFilesystem.
  *
- * Returns: (transfer full): a #BtdBtrfsMount
+ * Returns: (transfer full): a #BtdFilesystem
  */
-BtdBtrfsMount *
-btd_btrfs_mount_new (const gchar *device, const gchar *mountpoint)
+BtdFilesystem *
+btd_filesystem_new (const gchar *device, const gchar *mountpoint)
 {
-    BtdBtrfsMount *self;
-    self = g_object_new (BTD_TYPE_BTRFS_MOUNT,
+    BtdFilesystem *self;
+    self = g_object_new (BTD_TYPE_FILESYSTEM,
                          "device_name",
                          device,
                          "mountpoint",
                          mountpoint,
                          NULL);
-    return BTD_BTRFS_MOUNT (self);
+    return BTD_FILESYSTEM (self);
 }
 
 /**
- * btd_btrfs_mount_get_device_name:
- * @self: An instance of #BtdBtrfsMount.
+ * btd_filesystem_get_device_name:
+ * @self: An instance of #BtdFilesystem.
  *
  * Returns: The device name backing this mountpoint.
  */
 const gchar *
-btd_btrfs_mount_get_device_name (BtdBtrfsMount *self)
+btd_filesystem_get_device_name (BtdFilesystem *self)
 {
-    BtdBtrfsMountPrivate *priv = GET_PRIVATE (self);
+    BtdFilesystemPrivate *priv = GET_PRIVATE (self);
     return priv->device_name;
 }
 
 /**
- * btd_btrfs_mount_get_mountpoint:
- * @self: An instance of #BtdBtrfsMount.
+ * btd_filesystem_get_mountpoint:
+ * @self: An instance of #BtdFilesystem.
  *
  * Returns: The mountpoint path.
  */
 const gchar *
-btd_btrfs_mount_get_mountpoint (BtdBtrfsMount *self)
+btd_filesystem_get_mountpoint (BtdFilesystem *self)
 {
-    BtdBtrfsMountPrivate *priv = GET_PRIVATE (self);
+    BtdFilesystemPrivate *priv = GET_PRIVATE (self);
     return priv->mountpoint;
 }
 
 /**
- * btd_btrfs_mount_read_usage:
- * @self: An instance of #BtdBtrfsMount.
+ * btd_filesystem_read_usage:
+ * @self: An instance of #BtdFilesystem.
  * @error: A #GError
  *
  * Read filesystem usage information (btrfs fi df).
@@ -233,9 +233,9 @@ btd_btrfs_mount_get_mountpoint (BtdBtrfsMount *self)
  * Returns: The Btrfs usage report.
  */
 gchar *
-btd_btrfs_mount_read_usage (BtdBtrfsMount *self, GError **error)
+btd_filesystem_read_usage (BtdFilesystem *self, GError **error)
 {
-    BtdBtrfsMountPrivate *priv = GET_PRIVATE (self);
+    BtdFilesystemPrivate *priv = GET_PRIVATE (self);
     GError *tmp_error = NULL;
     gint btrfs_exit_code;
     g_autofree gchar *df_output = NULL;
@@ -334,8 +334,8 @@ btd_parse_btrfs_device_stats (JsonArray *array, guint64 *errors_count)
 }
 
 /**
- * btd_btrfs_mount_read_error_stats:
- * @self: An instance of #BtdBtrfsMount.
+ * btd_filesystem_read_error_stats:
+ * @self: An instance of #BtdFilesystem.
  * @report: (out) (optional) (not nullable): Destination of a string report text.
  * @errors_count: (out) (optional): Number of detected erros
  * @error: A #GError, set if we failed to read statistics.
@@ -343,12 +343,12 @@ btd_parse_btrfs_device_stats (JsonArray *array, guint64 *errors_count)
  * Returns: %TRUE if stats were read successfully.
  */
 gboolean
-btd_btrfs_mount_read_error_stats (BtdBtrfsMount *self,
-                                  gchar **report,
-                                  guint64 *errors_count,
-                                  GError **error)
+btd_filesystem_read_error_stats (BtdFilesystem *self,
+                                 gchar **report,
+                                 guint64 *errors_count,
+                                 GError **error)
 {
-    BtdBtrfsMountPrivate *priv = GET_PRIVATE (self);
+    BtdFilesystemPrivate *priv = GET_PRIVATE (self);
     GError *tmp_error = NULL;
     gint btrfs_exit_code;
     g_autofree gchar *stats_output = NULL;
@@ -407,16 +407,16 @@ btd_btrfs_mount_read_error_stats (BtdBtrfsMount *self,
 }
 
 /**
- * btd_btrfs_mount_scrub:
- * @self: An instance of #BtdBtrfsMount.
+ * btd_filesystem_scrub:
+ * @self: An instance of #BtdFilesystem.
  * @error: A #GError, set if scrub failed.
  *
  * Returns: %TRUE if scrub operation completed without errors.
  */
 gboolean
-btd_btrfs_mount_scrub (BtdBtrfsMount *self, GError **error)
+btd_filesystem_scrub (BtdFilesystem *self, GError **error)
 {
-    BtdBtrfsMountPrivate *priv = GET_PRIVATE (self);
+    BtdFilesystemPrivate *priv = GET_PRIVATE (self);
     GError *tmp_error = NULL;
     gint btrfs_exit_code;
     g_autofree gchar *btrfs_stdout = NULL;
