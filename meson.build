@@ -40,6 +40,7 @@ conf.set_quoted('BINDIR',
 conf.set_quoted('SYSCONFDIR',
                 get_option('prefix') / get_option('sysconfdir'))
 conf.set_quoted('BTRFS_CMD', '/usr/bin/btrfs')
+conf.set('HAVE_SYSTEMD', true)
 conf.set('_DEFAULT_SOURCE', true)
 
 configure_file(output: 'config.h', configuration: conf)
@@ -124,6 +125,7 @@ gobject_dep = dependency('gobject-2.0', version: '>= 2.72')
 gio_dep = dependency('gio-2.0', version: '>= 2.72')
 json_glib_dep = dependency('json-glib-1.0', version: '>= 1.6.2')
 mount_dep = dependency('mount')
+libsystemd_dep = dependency('libsystemd')
 
 #
 # Modules

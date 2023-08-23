@@ -15,6 +15,7 @@
 #include "btd-scheduler.h"
 
 #include "btd-utils.h"
+#include "btd-logging.h"
 #include "btd-mailer.h"
 #include "btd-btrfs-mount.h"
 #include "btd-mount-record.h"
@@ -249,7 +250,7 @@ btd_scheduler_send_error_mail (BtdScheduler *self,
 
     template_bytes = btd_get_resource_data ("/btrfsd/error-mail.tmpl");
     if (template_bytes == NULL) {
-        g_critical ("Failed to find error-mail template data. This is a bug.");
+        btd_error ("Failed to find error-mail template data. This is a bug.");
         return FALSE;
     }
 
@@ -270,7 +271,7 @@ btd_scheduler_send_error_mail (BtdScheduler *self,
                                      NULL);
 
     if (!btd_send_email (mail_address, mail_body, &error)) {
-        g_warning ("Failed to send issue mail: %s", error->message);
+        btd_warning ("Failed to send issue mail: %s", error->message);
         return FALSE;
     }
 
@@ -336,9 +337,9 @@ btd_scheduler_run_scrub (BtdScheduler *self, BtdBtrfsMount *bmount, BtdMountReco
 
     g_debug ("Running scrub on filesystem %s", btd_btrfs_mount_get_mountpoint (bmount));
     if (!btd_btrfs_mount_scrub (bmount, &error)) {
-        g_warning ("Scrub on %s failed: %s",
-                   btd_btrfs_mount_get_mountpoint (bmount),
-                   error->message);
+        btd_warning ("Scrub on %s failed: %s",
+                     btd_btrfs_mount_get_mountpoint (bmount),
+                     error->message);
         return FALSE;
     }
 
@@ -374,9 +375,9 @@ btd_scheduler_run_for_mount (BtdScheduler *self, BtdBtrfsMount *bmount)
 
     record = btd_mount_record_new (btd_btrfs_mount_get_mountpoint (bmount));
     if (!btd_mount_record_load (record, &error)) {
-        g_warning ("Unable to load record for mount '%s': %s",
-                   btd_btrfs_mount_get_mountpoint (bmount),
-                   error->message);
+        btd_warning ("Unable to load record for mount '%s': %s",
+                     btd_btrfs_mount_get_mountpoint (bmount),
+                     error->message);
         g_clear_error (&error);
     }
 
@@ -406,9 +407,9 @@ btd_scheduler_run_for_mount (BtdScheduler *self, BtdBtrfsMount *bmount)
 
     /* save record & finish */
     if (!btd_mount_record_save (record, &error)) {
-        g_warning ("Unable to save state record for mount '%s': %s",
-                   btd_btrfs_mount_get_mountpoint (bmount),
-                   error->message);
+        btd_warning ("Unable to save state record for mount '%s': %s",
+                     btd_btrfs_mount_get_mountpoint (bmount),
+                     error->message);
         g_clear_error (&error);
     }
     return TRUE;
@@ -505,9 +506,9 @@ btd_scheduler_print_status (BtdScheduler *self)
 
             record = btd_mount_record_new (btd_btrfs_mount_get_mountpoint (bmount));
             if (!btd_mount_record_load (record, &error)) {
-                g_warning ("Unable to load record for mount '%s': %s",
-                           btd_btrfs_mount_get_mountpoint (bmount),
-                           error->message);
+                btd_warning ("Unable to load record for mount '%s': %s",
+                             btd_btrfs_mount_get_mountpoint (bmount),
+                             error->message);
                 g_clear_error (&error);
                 errors_found = TRUE;
                 continue;

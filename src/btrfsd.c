@@ -11,7 +11,7 @@
 #include <locale.h>
 
 #include "btd-scheduler.h"
-#include "btd-btrfs-mount.h"
+#include "btd-logging.h"
 
 int
 main (int argc, char **argv)
@@ -56,8 +56,8 @@ main (int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    if (verbose)
-        g_setenv ("G_MESSAGES_DEBUG", "all", TRUE);
+    /* set up logging (to console or syslog) */
+    btd_logging_setup (verbose);
 
     if (show_version) {
         g_print ("Btrfsd version: %s\n", PACKAGE_VERSION);
@@ -79,9 +79,14 @@ main (int argc, char **argv)
 
     /* run all scheduled actions */
     if (!btd_scheduler_run (scheduler, &error)) {
-        g_printerr ("Failed to run: %s\n", error->message);
+        if (btd_is_tty ())
+            g_printerr ("Failed to run: %s\n", error->message);
+        else
+            btd_error ("Btrfsd failed to run: %s", error->message);
+        btd_logging_finalize ();
         return EXIT_FAILURE;
     }
 
+    btd_logging_finalize ();
     return EXIT_SUCCESS;
 }

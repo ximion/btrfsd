@@ -4,10 +4,12 @@ btrfsd_src = [
     'btd-btrfs-mount.c',
     'btd-mount-record.h',
     'btd-mount-record.c',
-    'btd-scheduler.h',
-    'btd-scheduler.c',
     'btd-mailer.h',
     'btd-mailer.c',
+    'btd-scheduler.h',
+    'btd-scheduler.c',
+    'btd-logging.h',
+    'btd-logging.c',
     'btd-utils.h',
     'btd-utils.c',
 ]
@@ -24,6 +26,7 @@ btrfsd_deps = [
     gio_dep,
     json_glib_dep,
     mount_dep,
+    libsystemd_dep,
 ]
 
 btrfsd_lib = static_library(
