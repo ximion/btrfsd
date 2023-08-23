@@ -1,9 +1,10 @@
 [Unit]
 Description=Btrfs maintenance daemon
-After=fstrim.service
+After=local-fs.target fstrim.service
+Wants=local-fs.target
 
 [Service]
 Type=simple
-ExecStart=/usr/libexec/btrfsd
+ExecStart=@BTRFSD_INSTALL_BIN@
 IOSchedulingClass=idle
 CPUSchedulingPolicy=idle

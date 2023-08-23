@@ -1,10 +1,10 @@
 [Unit]
 Description=Perform Btrfs maintenance actions
-Documentation=man:btrfs
+Documentation=man:btrfsd
 
 [Timer]
-OnUnitActiveSec=90min
-RandomizedDelaySec=10min
+OnUnitActiveSec=62min
+RandomizedDelaySec=8min
 Persistent=true
 
 [Install]
