@@ -227,6 +227,7 @@ static gboolean
 btd_scheduler_send_error_mail (BtdScheduler *self,
                                BtdBtrfsMount *bmount,
                                BtdMountRecord *record,
+                               gboolean new_errors_found,
                                const gchar *mail_address,
                                const gchar *issue_report)
 {
@@ -240,9 +241,10 @@ btd_scheduler_send_error_mail (BtdScheduler *self,
     time_t current_time;
 
     current_time = time (NULL);
-    if (current_time - btd_mount_record_get_value_int (record, "messages", "issue_mail_sent", 0) <
-        SECONDS_IN_AN_HOUR * 14) {
-        g_debug ("Issue email for '%s' already sent today, will try again in 14h if the "
+    if (new_errors_found ||
+        current_time - btd_mount_record_get_value_int (record, "messages", "issue_mail_sent", 0) <
+            SECONDS_IN_AN_HOUR * 20) {
+        g_debug ("Issue email for '%s' already sent today, will try again in 20h if the "
                  "issue persists.",
                  btd_btrfs_mount_get_mountpoint (bmount));
         return TRUE;
@@ -294,7 +296,8 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount, BtdMountReco
 {
     g_autofree gchar *mail_address = NULL;
     g_autofree gchar *issue_report = NULL;
-    gboolean errors_found = FALSE;
+    guint64 error_count = 0;
+    guint64 prev_error_count = 0;
     g_autoptr(GError) error = NULL;
     time_t current_time;
 
@@ -303,7 +306,7 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount, BtdMountReco
     mail_address = btd_scheduler_get_config_value (self, bmount, "mail_address", NULL);
     if (mail_address != NULL)
         mail_address = g_strstrip (mail_address);
-    if (!btd_btrfs_mount_read_error_stats (bmount, &issue_report, &errors_found, &error)) {
+    if (!btd_btrfs_mount_read_error_stats (bmount, &issue_report, &error_count, &error)) {
         /* only log the error for now */
         g_printerr ("Failed to query btrfs issue statistics for '%s': %s\n",
                     btd_btrfs_mount_get_mountpoint (bmount),
@@ -312,13 +315,18 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount, BtdMountReco
     }
 
     /* we have nothing more to do if no errors were found */
-    if (!errors_found)
+    if (error_count == 0) {
+        btd_mount_record_set_value_int (record, "errors", "total", 0);
         return TRUE;
+    }
+    prev_error_count = btd_mount_record_get_value_int (record, "errors", "total", 0);
+    btd_mount_record_set_value_int (record, "errors", "total", (gint64) error_count);
 
     current_time = time (NULL);
 
-    if (current_time - btd_mount_record_get_value_int (record, "messages", "broadcast_sent", 0) >
-        SECONDS_IN_AN_HOUR * 6) {
+    if (error_count > prev_error_count ||
+        current_time - btd_mount_record_get_value_int (record, "messages", "broadcast_sent", 0) >
+            SECONDS_IN_AN_HOUR * 6) {
         g_autofree gchar *bc_message = NULL;
         /* broadcast message that there are errors to be fixed, do that roughly every 6h */
         bc_message = g_strdup_printf ("⚠ Errors detected on filesystem at %s!\n"
@@ -337,7 +345,13 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount, BtdMountReco
         return TRUE;
     }
 
-    return btd_scheduler_send_error_mail (self, bmount, record, mail_address, issue_report);
+    return btd_scheduler_send_error_mail (
+        self,
+        bmount,
+        record,
+        error_count > prev_error_count, /* True if error amount is increasing */
+        mail_address,
+        issue_report);
 }
 
 static gboolean

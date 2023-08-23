@@ -54,7 +54,7 @@ gchar         *btd_btrfs_mount_read_usage (BtdBtrfsMount *self, GError **error);
 
 gboolean       btd_btrfs_mount_read_error_stats (BtdBtrfsMount *self,
                                                  gchar        **report,
-                                                 gboolean      *errors_found,
+                                                 guint64       *errors_count,
                                                  GError       **error);
 
 gboolean       btd_btrfs_mount_scrub (BtdBtrfsMount *self, GError **error);

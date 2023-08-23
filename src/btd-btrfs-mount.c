@@ -269,11 +269,11 @@ btd_btrfs_mount_read_usage (BtdBtrfsMount *self, GError **error)
 }
 
 static gchar *
-btd_parse_btrfs_device_stats (JsonArray *array, gboolean *errors_found)
+btd_parse_btrfs_device_stats (JsonArray *array, guint64 *errors_count)
 {
     g_autoptr(GString) intro_text = NULL;
     g_autoptr(GString) issues_text = NULL;
-    gboolean have_errors = FALSE;
+    guint64 total_errors;
 
     intro_text = g_string_new ("Registered Devices:\n");
     issues_text = g_string_new ("Issue Report:\n");
@@ -289,16 +289,19 @@ btd_parse_btrfs_device_stats (JsonArray *array, gboolean *errors_found)
         gint64 corruption_errs = json_object_get_int_member (obj, "corruption_errs");
         gint64 generation_errs = json_object_get_int_member (obj, "generation_errs");
 
+        total_errors = write_io_errs + read_io_errs + flush_io_errs + corruption_errs +
+                       generation_errs;
+        if (errors_count != NULL)
+            *errors_count = total_errors;
+
         /* add device to the known devices list */
         g_string_append_printf (intro_text, "  • %s\n", device);
 
         /* if there are no errors, we don't add that information to the report */
-        if (write_io_errs == 0 && read_io_errs == 0 && flush_io_errs == 0 && corruption_errs == 0 &&
-            generation_errs == 0)
+        if (total_errors == 0)
             continue;
 
         /* we have issues, make a full report */
-        have_errors = TRUE;
         g_string_append_printf (issues_text, "Device: %s\n", device);
         g_string_append_printf (issues_text, "Devid:  %s\n", devid);
         g_string_append_printf (issues_text,
@@ -318,11 +321,8 @@ btd_parse_btrfs_device_stats (JsonArray *array, gboolean *errors_found)
                                 generation_errs);
     }
 
-    if (errors_found != NULL)
-        *errors_found = have_errors;
-
     /* finalize report */
-    if (!have_errors)
+    if (total_errors == 0)
         g_string_append (issues_text, "  • No errors found\n");
     g_string_append (intro_text, "\n");
     g_string_prepend (issues_text, intro_text->str);
@@ -337,7 +337,7 @@ btd_parse_btrfs_device_stats (JsonArray *array, gboolean *errors_found)
  * btd_btrfs_mount_read_error_stats:
  * @self: An instance of #BtdBtrfsMount.
  * @report: (out) (optional) (not nullable): Destination of a string report text.
- * @errors_found: (out) (optional): Set to %TRUE if any errors were detected.
+ * @errors_count: (out) (optional): Number of detected erros
  * @error: A #GError, set if we failed to read statistics.
  *
  * Returns: %TRUE if stats were read successfully.
@@ -345,7 +345,7 @@ btd_parse_btrfs_device_stats (JsonArray *array, gboolean *errors_found)
 gboolean
 btd_btrfs_mount_read_error_stats (BtdBtrfsMount *self,
                                   gchar **report,
-                                  gboolean *errors_found,
+                                  guint64 *errors_count,
                                   GError **error)
 {
     BtdBtrfsMountPrivate *priv = GET_PRIVATE (self);
@@ -399,7 +399,7 @@ btd_btrfs_mount_read_error_stats (BtdBtrfsMount *self,
     }
 
     /* parse stats & generate report */
-    tmp_report = btd_parse_btrfs_device_stats (device_stats, errors_found);
+    tmp_report = btd_parse_btrfs_device_stats (device_stats, errors_count);
     if (report != NULL)
         *report = g_steal_pointer (&tmp_report);
 
