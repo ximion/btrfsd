@@ -395,8 +395,11 @@ btd_machine_is_on_battery ()
             return FALSE;
         }
 
+        if (contents != NULL)
+            contents = g_strstrip (contents);
+
         /* we're on battery if we're discharging */
-        return g_str_has_prefix (g_strstrip (contents), "Discharging");
+        return g_str_has_prefix (contents, "Discharging");
     }
 
     /* extract battery state from D-Bus result */

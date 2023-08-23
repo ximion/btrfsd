@@ -145,10 +145,10 @@ btd_scheduler_get_config_value (BtdScheduler *self,
     g_autofree gchar *value = NULL;
 
     if (bmount == NULL) {
-        value = g_key_file_get_string (priv->config, "general", key, NULL);
+        value = g_key_file_get_string (priv->config, "default", key, NULL);
         if (value == NULL)
             return g_strdup (default_value);
-        return value;
+        return g_steal_pointer (&value);
     }
 
     value = g_key_file_get_string (priv->config,
@@ -157,12 +157,12 @@ btd_scheduler_get_config_value (BtdScheduler *self,
                                    NULL);
     if (value == NULL) {
         /* check generic section */
-        value = g_key_file_get_string (priv->config, "general", key, NULL);
+        value = g_key_file_get_string (priv->config, "default", key, NULL);
+        if (value == NULL)
+            return g_strdup (default_value);
     }
 
-    if (value == NULL)
-        return g_strdup (default_value);
-    return value;
+    return g_steal_pointer (&value);
 }
 
 /**
@@ -200,6 +200,7 @@ btd_scheduler_load (BtdScheduler *self, GError **error)
             g_propagate_prefixed_error (error, tmp_error, "Failed to load configuration:");
             return FALSE;
         }
+        btd_debug ("Loaded configuration: %s", config_fname);
     }
 
     priv->default_intervals[BTD_BTRFS_ACTION_SCRUB] = btd_scheduler_get_config_duration_str (
@@ -230,6 +231,7 @@ btd_scheduler_send_error_mail (BtdScheduler *self,
                                const gchar *issue_report)
 {
     g_autoptr(GBytes) template_bytes = NULL;
+    g_autofree gchar *mail_from = NULL;
     g_autofree gchar *formatted_time = NULL;
     g_autofree gchar *mail_body = NULL;
     g_autofree gchar *fs_usage = NULL;
@@ -246,7 +248,11 @@ btd_scheduler_send_error_mail (BtdScheduler *self,
         return TRUE;
     }
 
+    btd_debug ("Sending issue mail to %s", mail_address);
     formatted_time = g_date_time_format (dt_now, "%Y-%m-%d %H:%M:%S");
+    mail_from = btd_scheduler_get_config_value (self, bmount, "mail_from", NULL);
+    if (mail_from == NULL)
+        mail_from = g_strdup ("btrfsd");
 
     template_bytes = btd_get_resource_data ("/btrfsd/error-mail.tmpl");
     if (template_bytes == NULL) {
@@ -258,6 +264,8 @@ btd_scheduler_send_error_mail (BtdScheduler *self,
     if (fs_usage == NULL)
         fs_usage = g_strdup ("⚠ Failed to read usage data.");
     mail_body = btd_render_template (g_bytes_get_data (template_bytes, NULL),
+                                     "mail_from",
+                                     mail_from,
                                      "date_time",
                                      formatted_time,
                                      "hostname",
@@ -292,7 +300,9 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount, BtdMountReco
 
     g_debug ("Reading stats for %s", btd_btrfs_mount_get_mountpoint (bmount));
 
-    mail_address = g_strstrip (btd_scheduler_get_config_value (self, bmount, "mail_address", NULL));
+    mail_address = btd_scheduler_get_config_value (self, bmount, "mail_address", NULL);
+    if (mail_address != NULL)
+        mail_address = g_strstrip (mail_address);
     if (!btd_btrfs_mount_read_error_stats (bmount, &issue_report, &errors_found, &error)) {
         /* only log the error for now */
         g_printerr ("Failed to query btrfs issue statistics for '%s': %s\n",
@@ -322,8 +332,8 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdBtrfsMount *bmount, BtdMountReco
     }
 
     if (btd_is_empty (mail_address)) {
-        g_printerr ("Errors detected on filesystem '%s'!\n",
-                    btd_btrfs_mount_get_mountpoint (bmount));
+        btd_warning ("Errors detected on filesystem '%s'!\n",
+                     btd_btrfs_mount_get_mountpoint (bmount));
         return TRUE;
     }
 

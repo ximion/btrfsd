@@ -101,10 +101,10 @@ btd_log_va (BtdLogLevel level, const gchar *format, va_list args)
     if (_log_backend == LB_CONSOLE) {
         switch (level) {
         case BTD_LOG_LEVEL_INFO:
-            g_info ("%s", formatted_message);
+            g_print ("I: %s\n", formatted_message);
             break;
         case BTD_LOG_LEVEL_WARNING:
-            g_warning ("%s", formatted_message);
+            g_print ("W: %s\n", formatted_message);
             break;
         case BTD_LOG_LEVEL_ERROR:
             g_critical ("%s", formatted_message);
