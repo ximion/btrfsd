@@ -23,5 +23,5 @@ install_data(
 # Install example configuration file
 install_data(
     'settings.conf',
-    install_dir: get_option('sysconfdir')
+    install_dir: get_option('sysconfdir') / 'btrfsd'
 )
