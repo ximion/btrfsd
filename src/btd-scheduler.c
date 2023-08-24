@@ -557,6 +557,15 @@ btd_scheduler_print_status (BtdScheduler *self)
                 last_action_time_str = g_date_time_format (last_action_dt, "%Y-%m-%d %H:%M:%S");
             }
             g_print ("    Last run: %s\n", last_action_time_str);
+
+            if (j == BTD_BTRFS_ACTION_STATS) {
+                g_autofree gchar *mail_address = btd_scheduler_get_config_value (self,
+                                                                                 bfs,
+                                                                                 "mail_address",
+                                                                                 NULL);
+                if (mail_address != NULL)
+                    g_print ("    Error mails to: %s\n", mail_address);
+            }
         }
 
         g_print ("\n");
