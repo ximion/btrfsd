@@ -120,7 +120,7 @@ btd_user_is_root (void)
  * btd_parse_duration_string:
  * @str: The string to parse.
  *
- * Returns: The duration in seconds, or 0 on error.
+ * Returns: The duration in seconds, or 0 on error or if "never".
  */
 gulong
 btd_parse_duration_string (const gchar *str)
@@ -135,6 +135,8 @@ btd_parse_duration_string (const gchar *str)
     str_len = strlen (str);
     if (str_len < 1)
         return 0;
+    if (btd_str_equal0 (str, "never"))
+        return G_MAXULONG;
 
     suffix = str[str_len - 1];
     value = g_ascii_strtoll (str, NULL, 10);
@@ -286,6 +288,9 @@ btd_path_to_filename (const gchar *path)
 gchar *
 btd_humanize_time (gint64 seconds)
 {
+    if (seconds == 0)
+        return g_strdup ("Never");
+
     if (seconds < 60)
         return g_strdup_printf ("%" G_GINT64_FORMAT " %s",
                                 seconds,

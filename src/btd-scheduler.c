@@ -407,13 +407,20 @@ btd_scheduler_run_for_mount (BtdScheduler *self, BtdFilesystem *bfs)
         interval_time = btd_scheduler_get_config_duration_for_action (self,
                                                                       bfs,
                                                                       action_fn[i].action);
+        if (interval_time == 0) {
+            btd_debug ("Skipping %s on %s, action is disabled.",
+                       btd_btrfs_action_to_string (action_fn[i].action),
+                       btd_filesystem_get_mountpoint (bfs));
+            continue;
+        }
+
         last_time = btd_fs_record_get_last_action_time (record, action_fn[i].action);
         if (current_time - last_time > (gint64) interval_time) {
             /* first check if this action is even allowed to be run if we are on batter power */
             if (!action_fn[i].allow_on_battery && btd_machine_is_on_battery ()) {
-                g_debug ("Skipping %s on %s, we are running on battery power.",
-                         btd_btrfs_action_to_string (action_fn[i].action),
-                         btd_filesystem_get_mountpoint (bfs));
+                btd_debug ("Skipping %s on %s, we are running on battery power.",
+                           btd_btrfs_action_to_string (action_fn[i].action),
+                           btd_filesystem_get_mountpoint (bfs));
                 continue;
             }
 

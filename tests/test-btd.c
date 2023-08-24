@@ -101,6 +101,10 @@ test_humanize_time (void)
 {
     g_autofree gchar *result = NULL;
 
+    result = btd_humanize_time (0);
+    g_assert_cmpstr (result, ==, "Never");
+    g_clear_pointer (&result, g_free);
+
     result = btd_humanize_time (5);
     g_assert_cmpstr (result, ==, "5 seconds");
     g_clear_pointer (&result, g_free);
