@@ -1,5 +1,6 @@
 [Unit]
 Description=Btrfs maintenance daemon
+Documentation=man:btrfsd
 After=local-fs.target fstrim.service
 Wants=local-fs.target
 
