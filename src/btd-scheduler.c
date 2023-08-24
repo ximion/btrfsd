@@ -214,7 +214,7 @@ btd_scheduler_load (BtdScheduler *self, GError **error)
         self,
         "default",
         btd_get_interval_key (BTD_BTRFS_ACTION_BALANCE),
-        "4M");
+        "never");
 
     priv->loaded = TRUE;
     return TRUE;
