@@ -236,14 +236,17 @@ btd_scheduler_send_error_mail (BtdScheduler *self,
     g_autoptr(GError) error = NULL;
     g_autoptr(GDateTime) dt_now = g_date_time_new_now_local ();
     time_t current_time;
+    time_t time_last_mail;
 
     current_time = time (NULL);
-    if (!new_errors_found &&
-        current_time - btd_fs_record_get_value_int (record, "messages", "issue_mail_sent", 0) <
-            SECONDS_IN_AN_HOUR * 20) {
-        btd_debug ("Issue email for '%s' already sent today and no new issues found, will try "
-                   "again in 20h if the issues persist.",
-                   btd_filesystem_get_mountpoint (bfs));
+    time_last_mail = btd_fs_record_get_value_int (record, "messages", "issue_mail_sent", 0);
+    if (!new_errors_found && (current_time - time_last_mail) < SECONDS_IN_AN_HOUR * 20) {
+        g_autofree gchar *time_waiting_str = btd_humanize_time ((SECONDS_IN_AN_HOUR * 20) -
+                                                                (current_time - time_last_mail));
+        btd_debug ("Issue email for '%s' already sent and no new issues found, will send "
+                   "a reminder in %s if the issues persist.",
+                   btd_filesystem_get_mountpoint (bfs),
+                   time_waiting_str);
         return TRUE;
     }
 
@@ -331,7 +334,7 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdFilesystem *bfs, BtdFsRecord *re
         /* broadcast message that there are errors to be fixed, do that roughly every 6h */
         bc_message = g_strdup_printf ("⚠ Errors detected on filesystem at %s!\n"
                                       "Please back up your files immediately. You can run "
-                                      "`btrfs device stats %s` for issue details.\n",
+                                      "`btrfs device stats %s` for details.\n",
                                       btd_filesystem_get_mountpoint (bfs),
                                       btd_filesystem_get_mountpoint (bfs));
 
