@@ -298,7 +298,7 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdFilesystem *bfs, BtdFsRecord *re
     g_autoptr(GError) error = NULL;
     time_t current_time;
 
-    g_debug ("Reading stats for %s", btd_filesystem_get_mountpoint (bfs));
+    btd_debug ("Reading stats for %s", btd_filesystem_get_mountpoint (bfs));
 
     mail_address = btd_scheduler_get_config_value (self, bfs, "mail_address", NULL);
     if (mail_address != NULL)
@@ -355,7 +355,7 @@ btd_scheduler_run_scrub (BtdScheduler *self, BtdFilesystem *bfs, BtdFsRecord *re
 {
     g_autoptr(GError) error = NULL;
 
-    g_debug ("Running scrub on filesystem %s", btd_filesystem_get_mountpoint (bfs));
+    btd_debug ("Running scrub on filesystem %s", btd_filesystem_get_mountpoint (bfs));
     if (!btd_filesystem_scrub (bfs, &error)) {
         btd_warning ("Scrub on %s failed: %s", btd_filesystem_get_mountpoint (bfs), error->message);
         return FALSE;
@@ -367,7 +367,16 @@ btd_scheduler_run_scrub (BtdScheduler *self, BtdFilesystem *bfs, BtdFsRecord *re
 static gboolean
 btd_scheduler_run_balance (BtdScheduler *self, BtdFilesystem *bfs, BtdFsRecord *record)
 {
-    /* TODO */
+    g_autoptr(GError) error = NULL;
+
+    btd_debug ("Running balance on filesystem %s", btd_filesystem_get_mountpoint (bfs));
+    if (!btd_filesystem_balance (bfs, &error)) {
+        btd_warning ("Balance on %s failed: %s",
+                     btd_filesystem_get_mountpoint (bfs),
+                     error->message);
+        return FALSE;
+    }
+
     return TRUE;
 }
 

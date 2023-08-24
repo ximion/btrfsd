@@ -19,6 +19,7 @@
 #include <json-glib/json-glib.h>
 
 #include "btd-utils.h"
+#include "btd-logging.h"
 
 typedef struct {
     gchar *device_name;
@@ -359,6 +360,7 @@ btd_filesystem_read_error_stats (BtdFilesystem *self,
     JsonArray *device_stats = NULL;
 
     gchar *command[] = { BTRFS_CMD, "--format=json", "device", "stats", priv->mountpoint, NULL };
+    btd_debug ("Running btrfs device stats on %s", priv->mountpoint);
     if (!g_spawn_sync (NULL, /* working directory */
                        command,
                        NULL, /* envp */
@@ -423,6 +425,7 @@ btd_filesystem_scrub (BtdFilesystem *self, GError **error)
     g_autofree gchar *btrfs_stderr = NULL;
 
     gchar *command[] = { BTRFS_CMD, "-q", "scrub", "start", "-B", priv->mountpoint, NULL };
+    btd_info ("Running btrfs scrub on %s", priv->mountpoint);
     if (!g_spawn_sync (NULL, /* working directory */
                        command,
                        NULL, /* envp */
@@ -458,5 +461,64 @@ btd_filesystem_scrub (BtdFilesystem *self, GError **error)
     }
 
     /* scrub ran successfully */
+    return TRUE;
+}
+
+/**
+ * btd_filesystem_balance:
+ * @self: An instance of #BtdFilesystem.
+ * @error: A #GError, set if scrub failed.
+ *
+ * Run balance operation with some sensible defaults.
+ *
+ * Returns: %TRUE if balance operation completed without errors.
+ */
+gboolean
+btd_filesystem_balance (BtdFilesystem *self, GError **error)
+{
+    BtdFilesystemPrivate *priv = GET_PRIVATE (self);
+    GError *tmp_error = NULL;
+    gint btrfs_exit_code;
+    g_autofree gchar *btrfs_stdout = NULL;
+    g_autofree gchar *btrfs_stderr = NULL;
+
+    gchar *command[] = { BTRFS_CMD,    "balance",    "start",          "--enqueue",
+                         "-dusage=15", "-musage=10", priv->mountpoint, NULL };
+    btd_info ("Running btrfs balance on %s", priv->mountpoint);
+    if (!g_spawn_sync (NULL, /* working directory */
+                       command,
+                       NULL, /* envp */
+                       G_SPAWN_DEFAULT,
+                       NULL,
+                       NULL,
+                       &btrfs_stdout,
+                       &btrfs_stderr,
+                       &btrfs_exit_code,
+                       &tmp_error)) {
+        g_propagate_prefixed_error (error, tmp_error, "Failed to execute btrfs balance command:");
+        return FALSE;
+    }
+
+    if (btrfs_exit_code != 0) {
+        g_autofree gchar *output_msg = NULL;
+        btrfs_stdout = btd_strstripnl (btrfs_stdout);
+        btrfs_stderr = btd_strstripnl (btrfs_stderr);
+
+        if (btd_is_empty (btrfs_stdout))
+            output_msg = g_steal_pointer (&btrfs_stderr);
+        else if (btd_is_empty (btrfs_stderr))
+            output_msg = g_steal_pointer (&btrfs_stdout);
+        else
+            output_msg = g_strconcat (btrfs_stderr, "\n", btrfs_stdout, NULL);
+
+        g_set_error (error,
+                     BTD_BTRFS_ERROR,
+                     BTD_BTRFS_ERROR_SCRUB_FAILED,
+                     "Balance action failed: %s",
+                     output_msg);
+        return FALSE;
+    }
+
+    /* balance ran successfully */
     return TRUE;
 }

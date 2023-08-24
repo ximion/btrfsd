@@ -59,4 +59,6 @@ gboolean       btd_filesystem_read_error_stats (BtdFilesystem *self,
 
 gboolean       btd_filesystem_scrub (BtdFilesystem *self, GError **error);
 
+gboolean       btd_filesystem_balance (BtdFilesystem *self, GError **error);
+
 G_END_DECLS
