@@ -136,7 +136,7 @@ btd_parse_duration_string (const gchar *str)
     if (str_len < 1)
         return 0;
     if (btd_str_equal0 (str, "never"))
-        return G_MAXULONG;
+        return 0;
 
     suffix = str[str_len - 1];
     value = g_ascii_strtoll (str, NULL, 10);
