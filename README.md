@@ -2,7 +2,8 @@
 [![Build Test](https://github.com/ximion/btrfsd/actions/workflows/build-test.yml/badge.svg)](https://github.com/ximion/btrfsd/actions/workflows/build-test.yml)
 
 Btrfsd is a lightweight daemon that takes care of all Btrfs filesystems on a Linux system.
-It will periodically:
+
+It will:
  * Check `stats` for errors and broadcast a warning if any were found, or send an email
  * Perform `scrub` periodically if system is not on battery
  * Run `balance` (rarely, if system is not on battery)

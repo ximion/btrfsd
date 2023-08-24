@@ -1,22 +1,22 @@
 <?xml version='1.0' encoding='ISO-8859-1'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
-"http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd" [
+		"http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd" [
 
-  <!ENTITY date        "<date>18 Aug,2023</date>">
-  <!-- SECTION should be 1-8, maybe w/ subsection other parameters are
-       allowed: see man(7), man(1). -->
-  <!ENTITY package     "btrfsd">
-]>
+		<!ENTITY date        "<date>18 Aug,2023</date>">
+		<!-- SECTION should be 1-8, maybe w/ subsection other parameters are
+             allowed: see man(7), man(1). -->
+		<!ENTITY package     "btrfsd">
+		]>
 
 <refentry>
 	<refentryinfo>
-	<title>btrfsd</title>
-	<copyright>
-		<year>2022-2023</year>
-		<holder>Matthias Klumpp</holder>
-	</copyright>
-	<productname>Btrfsd</productname>
-	&date;
+		<title>btrfsd</title>
+		<copyright>
+			<year>2022-2023</year>
+			<holder>Matthias Klumpp</holder>
+		</copyright>
+		<productname>Btrfsd</productname>
+		&date;
 	</refentryinfo>
 
 	<refmeta>
@@ -25,15 +25,15 @@
 	</refmeta>
 	<refnamediv>
 		<refname>btrfsd</refname>
-		<refpurpose>Btrfs maintanence daemon</refpurpose>
+		<refpurpose>Btrfs maintenance daemon</refpurpose>
 	</refnamediv>
 
-       <refsynopsisdiv>
-	       <cmdsynopsis>
-		       <command>&package;</command>
-		       <group>
-			       <option>COMMAND</option>
-		       </group>
+	<refsynopsisdiv>
+		<cmdsynopsis>
+			<command>&package;</command>
+			<group>
+				<option>COMMAND</option>
+			</group>
 		</cmdsynopsis>
 	</refsynopsisdiv>
 
@@ -44,35 +44,74 @@
 		</para>
 		<para>
 			Btrfsd is a lightweight daemon that takes care of all Btrfs filesystems on a Linux system.
-      It will periodically:
-    </para>
-    <itemizedlist>
-        <listitem><para>Check <emphasis>stats</emphasis> for errors and broadcast a warning if any were found, or send an email</para></listitem>
-        <listitem><para>Perform <emphasis>scrub</emphasis> periodically if system is not on battery</para></listitem>
-        <listitem><para>Run <emphasis>balance</emphasis> occasionally if not on battery power</para></listitem>
-    </itemizedlist>
-    <para>
-      The daemon is explicitly designed to be run on any system, from a small notebook to a large
-      storage server. Depending on the system, it should make the best possible decision for
-      running maintenance jobs, but may also be tweaked by the user.
+			It will:
+		</para>
+		<itemizedlist>
+			<listitem><para>Check <emphasis>stats</emphasis> for errors and broadcast a warning if any were found, or send an email</para></listitem>
+			<listitem><para>Perform <emphasis>scrub</emphasis> periodically if system is not on battery</para></listitem>
+			<listitem><para>Run <emphasis>balance</emphasis> occasionally if not on battery power</para></listitem>
+		</itemizedlist>
+		<para>
+			The daemon is explicitly designed to be run on any system, from a small notebook to a large
+			storage server. Depending on the system, it should make the best possible decision for
+			running maintenance jobs, but may also be tweaked by the user.
 		</para>
 	</refsect1>
 
 	<refsect1>
-		<title>Options</title>
+		<title>Configuration</title>
+		<para>
+			The daemon will run on its own, without any configuration, and monitor all Btrfs filesystems mounted on the system
+			(or do nothing if none were found).
+			However, the user may tweak some settings via its configuration file: <filename>/etc/btrfsd/settings.conf</filename>
+		</para>
+		<para>
+			The configuration file is an Ini-style text file, with one section per Btrfs mount point. If no section for a mountpoint
+			with settings was found, the values from the <literal>default</literal> section are used.
+		</para>
+		<para>
+			Every <code>*_interval</code> maintenance action interval may contain an integer time value with a unit character behind it:
+			<code>h</code> for hours, <code>d</code> for days and <code>M</code> for months. The special value <code>never</code> will
+			prevent the action from being executed. Going below an hour for actions is not recommended, as &package; is only woken up hourly
+			by the system to check for pending actions.
+		</para>
+		<para>Example:</para>
+		<programlisting language="ini"><![CDATA[
+[default]
+mail_address=root
+
+stats_interval=1h
+scrub_interval=1M
+balance_interval=6M
+
+[/mnt/storage1]
+scrub_interval=2M
+balance_interval=never
+]]></programlisting>
+	</refsect1>
+
+	<refsect1>
+		<title>Command-line Options</title>
 		<variablelist>
 
 			<varlistentry>
 				<term><option>--verbose</option></term>
 				<listitem>
-					<para>Display extra debugging information</para>
+					<para>Display extra debugging information.</para>
 				</listitem>
 			</varlistentry>
 
 			<varlistentry>
 				<term><option>--version</option></term>
 				<listitem>
-					<para>Display the version number of &package;</para>
+					<para>Display the version number of &package;.</para>
+				</listitem>
+			</varlistentry>
+
+			<varlistentry>
+				<term><option>--status</option></term>
+				<listitem>
+					<para>Display the status of the daemon and its various tasks, as well as its configuration.</para>
 				</listitem>
 			</varlistentry>
 
@@ -85,10 +124,10 @@
 			<citerefentry><refentrytitle>btrfs</refentrytitle><manvolnum>1</manvolnum></citerefentry>.
 		</para>
 	</refsect1>
-<refsect1>
-<title>AUTHOR</title>
-<para>
-	This manual page was written by Matthias Klumpp <email>matthias@tenstral.net</email>.
-</para>
-</refsect1>
+	<refsect1>
+		<title>AUTHOR</title>
+		<para>
+			This manual page was written by Matthias Klumpp <email>matthias@tenstral.net</email>.
+		</para>
+	</refsect1>
 </refentry>
