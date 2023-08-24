@@ -1,4 +1,10 @@
 
+option('btrfs-cmd',
+    type: 'string',
+    value: 'auto',
+    description: 'Path to the "btrfs" command, set to "auto" to autodetect.'
+)
+
 #
 # For development
 #

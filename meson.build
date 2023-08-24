@@ -19,6 +19,13 @@ btrfsd_micro_version = varr[2]
 #
 # Configure files
 #
+btrfs_exe_path = get_option('btrfs-cmd')
+if btrfs_exe_path == 'auto'
+    btrfs_exe = find_program('btrfs', dirs: ['/usr/bin', '/usr/sbin', '/bin', '/sbin'], required : false)
+    btrfs_exe_path = btrfs_exe.found() ? btrfs_exe.full_path() : '/usr/bin/btrfs'
+endif
+message('Using `btrfs` executable:', btrfs_exe_path)
+
 conf = configuration_data()
 conf.set('BTRFSD_MAJOR_VERSION_CONF', btrfsd_major_version)
 conf.set('BTRFSD_MINOR_VERSION_CONF', btrfsd_minor_version)
@@ -39,7 +46,7 @@ conf.set_quoted('BINDIR',
                 get_option('prefix') / get_option('bindir'))
 conf.set_quoted('SYSCONFDIR',
                 get_option('prefix') / get_option('sysconfdir'))
-conf.set_quoted('BTRFS_CMD', '/usr/bin/btrfs')
+conf.set_quoted('BTRFS_CMD', btrfs_exe_path)
 conf.set('HAVE_SYSTEMD', true)
 conf.set('_DEFAULT_SOURCE', true)
 
