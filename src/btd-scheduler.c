@@ -238,12 +238,12 @@ btd_scheduler_send_error_mail (BtdScheduler *self,
     time_t current_time;
 
     current_time = time (NULL);
-    if (new_errors_found ||
+    if (!new_errors_found &&
         current_time - btd_fs_record_get_value_int (record, "messages", "issue_mail_sent", 0) <
             SECONDS_IN_AN_HOUR * 20) {
-        g_debug ("Issue email for '%s' already sent today, will try again in 20h if the "
-                 "issue persists.",
-                 btd_filesystem_get_mountpoint (bfs));
+        btd_debug ("Issue email for '%s' already sent today and no new issues found, will try "
+                   "again in 20h if the issues persist.",
+                   btd_filesystem_get_mountpoint (bfs));
         return TRUE;
     }
 
@@ -319,11 +319,14 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdFilesystem *bfs, BtdFsRecord *re
     prev_error_count = btd_fs_record_get_value_int (record, "errors", "total", 0);
     btd_fs_record_set_value_int (record, "errors", "total", (gint64) error_count);
 
+    btd_debug ("Found %" G_GUINT64_FORMAT " errors for %s",
+               error_count,
+               btd_filesystem_get_mountpoint (bfs));
     current_time = time (NULL);
 
     if (error_count > prev_error_count ||
-        current_time - btd_fs_record_get_value_int (record, "messages", "broadcast_sent", 0) >
-            SECONDS_IN_AN_HOUR * 6) {
+        (current_time - btd_fs_record_get_value_int (record, "messages", "broadcast_sent", 0) >
+         SECONDS_IN_AN_HOUR * 6)) {
         g_autofree gchar *bc_message = NULL;
         /* broadcast message that there are errors to be fixed, do that roughly every 6h */
         bc_message = g_strdup_printf ("⚠ Errors detected on filesystem at %s!\n"
@@ -337,7 +340,7 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdFilesystem *bfs, BtdFsRecord *re
     }
 
     if (btd_is_empty (mail_address)) {
-        btd_warning ("Errors detected on filesystem '%s'!\n", btd_filesystem_get_mountpoint (bfs));
+        btd_warning ("Errors detected on filesystem '%s'", btd_filesystem_get_mountpoint (bfs));
         return TRUE;
     }
 
