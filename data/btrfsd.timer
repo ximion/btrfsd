@@ -4,7 +4,7 @@ Documentation=man:btrfsd
 
 [Timer]
 OnUnitActiveSec=62min
-RandomizedDelaySec=8min
+RandomizedDelaySec=6min
 Persistent=true
 
 [Install]
