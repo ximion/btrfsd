@@ -82,7 +82,7 @@ mail_address=root
 
 stats_interval=1h
 scrub_interval=1M
-balance_interval=6M
+balance_interval=3M
 
 [/mnt/storage1]
 scrub_interval=2M
