@@ -77,3 +77,6 @@ AllowShortEnumsOnASingleLine: false
 
 # break after operators
 BreakBeforeBinaryOperators: None
+
+# don't try to align structure arrays
+AlignArrayOfStructures: None
