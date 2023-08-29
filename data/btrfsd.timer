@@ -1,8 +1,10 @@
 [Unit]
 Description=Perform Btrfs maintenance actions
 Documentation=man:btrfsd
+ConditionVirtualization=!container
 
 [Timer]
+OnBootSec=10min
 OnUnitActiveSec=62min
 RandomizedDelaySec=6min
 Persistent=true
