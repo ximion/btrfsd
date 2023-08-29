@@ -5,8 +5,8 @@ ConditionVirtualization=!container
 
 [Timer]
 OnBootSec=10min
-OnUnitActiveSec=62min
-RandomizedDelaySec=6min
+OnUnitActiveSec=50min
+RandomizedDelaySec=8min
 Persistent=true
 
 [Install]
