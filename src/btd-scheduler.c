@@ -25,6 +25,7 @@ typedef struct {
     GPtrArray *mountpoints;
     GKeyFile *config;
     gchar *state_dir;
+    time_t reference_time;
 
     gulong default_intervals[BTD_BTRFS_ACTION_LAST];
 } BtdSchedulerPrivate;
@@ -186,6 +187,11 @@ btd_scheduler_load (BtdScheduler *self, GError **error)
         return FALSE;
     }
 
+    /* The origin reference time when the scheduler was loaded, "current time".
+     * We reduce the current time by a minute, just in case there were any delays after cron
+     * called us, so we for sure run all remaining tasks if we are called again in an hour. */
+    priv->reference_time = time (NULL) - 60;
+
     if (priv->mountpoints != NULL)
         g_ptr_array_unref (priv->mountpoints);
     priv->mountpoints = btd_find_mounted_btrfs_filesystems (error);
@@ -228,6 +234,7 @@ btd_scheduler_send_error_mail (BtdScheduler *self,
                                const gchar *mail_address,
                                const gchar *issue_report)
 {
+    BtdSchedulerPrivate *priv = GET_PRIVATE (self);
     g_autoptr(GBytes) template_bytes = NULL;
     g_autofree gchar *mail_from = NULL;
     g_autofree gchar *formatted_time = NULL;
@@ -235,14 +242,12 @@ btd_scheduler_send_error_mail (BtdScheduler *self,
     g_autofree gchar *fs_usage = NULL;
     g_autoptr(GError) error = NULL;
     g_autoptr(GDateTime) dt_now = g_date_time_new_now_local ();
-    time_t current_time;
     time_t time_last_mail;
 
-    current_time = time (NULL);
     time_last_mail = btd_fs_record_get_value_int (record, "messages", "issue_mail_sent", 0);
-    if (!new_errors_found && (current_time - time_last_mail) < SECONDS_IN_AN_HOUR * 20) {
+    if (!new_errors_found && (priv->reference_time - time_last_mail) < SECONDS_IN_AN_HOUR * 20) {
         g_autofree gchar *time_waiting_str = btd_humanize_time ((SECONDS_IN_AN_HOUR * 20) -
-                                                                (current_time - time_last_mail));
+                                                                (priv->reference_time - time_last_mail));
         btd_debug ("Issue email for '%s' already sent and no new issues found, will send "
                    "a reminder in %s if the issues persist.",
                    btd_filesystem_get_mountpoint (bfs),
@@ -286,7 +291,7 @@ btd_scheduler_send_error_mail (BtdScheduler *self,
     }
 
     /* we have sent the mail, record that fact so we don't spam messages too frequently */
-    btd_fs_record_set_value_int (record, "messages", "issue_mail_sent", current_time);
+    btd_fs_record_set_value_int (record, "messages", "issue_mail_sent", priv->reference_time);
 
     return TRUE;
 }
@@ -294,12 +299,12 @@ btd_scheduler_send_error_mail (BtdScheduler *self,
 static gboolean
 btd_scheduler_run_stats (BtdScheduler *self, BtdFilesystem *bfs, BtdFsRecord *record)
 {
+    BtdSchedulerPrivate *priv = GET_PRIVATE (self);
     g_autofree gchar *mail_address = NULL;
     g_autofree gchar *issue_report = NULL;
     guint64 error_count = 0;
     guint64 prev_error_count = 0;
     g_autoptr(GError) error = NULL;
-    time_t current_time;
 
     btd_debug ("Reading stats for %s", btd_filesystem_get_mountpoint (bfs));
 
@@ -325,10 +330,9 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdFilesystem *bfs, BtdFsRecord *re
     btd_debug ("Found %" G_GUINT64_FORMAT " errors for %s",
                error_count,
                btd_filesystem_get_mountpoint (bfs));
-    current_time = time (NULL);
 
     if (error_count > prev_error_count ||
-        (current_time - btd_fs_record_get_value_int (record, "messages", "broadcast_sent", 0) >
+        (priv->reference_time - btd_fs_record_get_value_int (record, "messages", "broadcast_sent", 0) >
          SECONDS_IN_AN_HOUR * 6)) {
         g_autofree gchar *bc_message = NULL;
         /* broadcast message that there are errors to be fixed, do that roughly every 6h */
@@ -339,7 +343,7 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdFilesystem *bfs, BtdFsRecord *re
                                       btd_filesystem_get_mountpoint (bfs));
 
         btd_broadcast_message (bc_message);
-        btd_fs_record_set_value_int (record, "messages", "broadcast_sent", current_time);
+        btd_fs_record_set_value_int (record, "messages", "broadcast_sent", priv->reference_time);
     }
 
     if (btd_is_empty (mail_address)) {
@@ -389,11 +393,11 @@ btd_scheduler_run_balance (BtdScheduler *self, BtdFilesystem *bfs, BtdFsRecord *
 static gboolean
 btd_scheduler_run_for_mount (BtdScheduler *self, BtdFilesystem *bfs)
 {
+    BtdSchedulerPrivate *priv = GET_PRIVATE (self);
     g_autoptr(BtdFsRecord) record = NULL;
     g_autoptr(GError) error = NULL;
-    gint64 current_time;
     gint64 last_time;
-    gulong interval_time;
+    time_t interval_time;
     struct {
         BtdBtrfsAction action;
         BtdActionFunction func;
@@ -414,12 +418,9 @@ btd_scheduler_run_for_mount (BtdScheduler *self, BtdFilesystem *bfs)
         g_clear_error (&error);
     }
 
-    /* current time */
-    current_time = (gint64) time (NULL);
-
     /* run all actions */
     for (guint i = 0; action_fn[i].func != NULL; i++) {
-        interval_time = btd_scheduler_get_config_duration_for_action (self,
+        interval_time = (time_t) btd_scheduler_get_config_duration_for_action (self,
                                                                       bfs,
                                                                       action_fn[i].action);
         if (interval_time == 0) {
@@ -430,7 +431,7 @@ btd_scheduler_run_for_mount (BtdScheduler *self, BtdFilesystem *bfs)
         }
 
         last_time = btd_fs_record_get_last_action_time (record, action_fn[i].action);
-        if (current_time - last_time > (gint64) interval_time) {
+        if (priv->reference_time - last_time > interval_time) {
             /* first check if this action is even allowed to be run if we are on batter power */
             if (!action_fn[i].allow_on_battery && btd_machine_is_on_battery ()) {
                 btd_debug ("Skipping %s on %s, we are running on battery power.",
