@@ -7,7 +7,7 @@ It can:
 * Check for detected errors and broadcast a warning if any were found,
   or optionally send an email
 * Perform scrub periodically if the system is not on battery
-* Optionally run balancing operations periodically
+* Optionally schedule balancing operations as well
 
 The daemon is explicitly designed to be run on any system, from a small notebook to a large
 storage server. Depending on the system, it should make the best possible decision for
