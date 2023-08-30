@@ -4,10 +4,8 @@ Documentation=man:btrfsd
 ConditionVirtualization=!container
 
 [Timer]
-OnBootSec=10min
-OnUnitActiveSec=50min
-RandomizedDelaySec=8min
-Persistent=true
+OnBootSec=5min
+OnUnitActiveSec=1h
 
 [Install]
 WantedBy=timers.target
