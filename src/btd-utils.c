@@ -411,9 +411,6 @@ btd_machine_is_on_battery ()
     g_variant_get (result, "(v)", &result);
     state = g_variant_get_uint32 (result);
 
-    g_variant_unref (result);
-    g_object_unref (connection);
-
     /* 2 is the value for "discharging" in upower */
     return state == 2;
 }
