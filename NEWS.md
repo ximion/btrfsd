@@ -1,3 +1,10 @@
+Version 0.2.1
+-------------
+Released: 2023-10-14
+
+Bugfixes:
+ * utils: Don't free result twice when checking if device is on battery
+
 Version 0.2.0
 -------------
 Released: 2023-08-30
