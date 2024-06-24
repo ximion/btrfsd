@@ -2,17 +2,17 @@ Btrfsd Release Notes
 
 1. Set variables
 
-OLD_VERSION="0.2.1"
-NEW_VERSION="0.2.2"
+OLD_VERSION="0.2.2"
+NEW_VERSION="0.2.3"
 
 2. Write NEWS.md entries for Btrfsd in the same format as usual.
 
 git shortlog v$OLD_VERSION.. | grep -i -v trivial | grep -v Merge > NEWS.new
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Version 0.2.2
+Version 0.2.3
 -------------
-Released: 2023-xx-xx
+Released: 2024-xx-xx
 
 Notes:
 
