@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Install Btrfsd build dependencies
 #
@@ -28,7 +28,10 @@ eatmydata apt-get install -yq --no-install-recommends \
     systemd \
     libglib2.0-dev \
     libsystemd-dev \
-    systemd-dev \
     gtk-doc-tools \
     libmount-dev \
     libjson-glib-dev
+
+if apt-cache show systemd-dev > /dev/null 2>&1; then
+    eatmydata apt-get install -yq systemd-dev
+fi
