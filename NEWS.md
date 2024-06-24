@@ -1,3 +1,17 @@
+Version 0.2.2
+-------------
+Released: 2024-06-24
+
+Features:
+ * Only run all tasks once per filesystem
+
+Bugfixes:
+ * Fix potential use of uninitialized variable
+ * Handle more error conditions in a noisy way when sending emails
+
+Miscellaneous:
+ * ci: Install systemd-dev on modern Debian
+
 Version 0.2.1
 -------------
 Released: 2023-10-14
