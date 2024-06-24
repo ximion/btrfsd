@@ -55,6 +55,8 @@ btd_send_email (const gchar *to_address, const gchar *body, GError **error)
 {
     g_autofree gchar *sendmail_exe = NULL;
     g_autofree gchar *email_content = NULL;
+    size_t email_content_len;
+    ssize_t write_result;
     g_autoptr(GError) tmp_error = NULL;
     const gchar *sm_argv[3];
     GPid child_pid;
@@ -92,12 +94,29 @@ btd_send_email (const gchar *to_address, const gchar *body, GError **error)
     }
 
     /* write email content to stdin of sendmail */
-    (void) write (stdin_fd, email_content, strlen (email_content));
+    email_content_len = strlen (email_content);
+    write_result = write (stdin_fd, email_content, email_content_len);
+
     close (stdin_fd);
-
     g_spawn_close_pid (child_pid);
-    waitpid (child_pid, &exit_status, 0);
 
+    if (write_result == -1) {
+        g_set_error_literal (error,
+                             BTD_MAIL_ERROR,
+                             BTD_MAIL_ERROR_FAILED,
+                             "Failed to write email content to sendmail process.");
+        return FALSE;
+    } else if ((size_t) write_result < email_content_len) {
+        g_set_error (error,
+                     BTD_MAIL_ERROR,
+                     BTD_MAIL_ERROR_FAILED,
+                     "Could not write all data to sendmail: only %zd of %zu bytes written.",
+                     write_result,
+                     email_content_len);
+        return FALSE;
+    }
+
+    waitpid (child_pid, &exit_status, 0);
     if (exit_status != 0) {
         g_set_error (error,
                      BTD_MAIL_ERROR,
@@ -134,7 +153,7 @@ btd_broadcast_message (const gchar *message)
             fd = open (term_path, O_WRONLY);
             if (fd != -1) {
                 /* write the message to the terminal */
-                (void) write (fd, message, strlen (message));
+                (void) !write (fd, message, strlen (message));
                 close (fd);
             }
         }
