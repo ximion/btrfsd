@@ -246,8 +246,8 @@ btd_scheduler_send_error_mail (BtdScheduler *self,
 
     time_last_mail = btd_fs_record_get_value_int (record, "messages", "issue_mail_sent", 0);
     if (!new_errors_found && (priv->reference_time - time_last_mail) < SECONDS_IN_AN_HOUR * 20) {
-        g_autofree gchar *time_waiting_str = btd_humanize_time ((SECONDS_IN_AN_HOUR * 20) -
-                                                                (priv->reference_time - time_last_mail));
+        g_autofree gchar *time_waiting_str = btd_humanize_time (
+            (SECONDS_IN_AN_HOUR * 20) - (priv->reference_time - time_last_mail));
         btd_debug ("Issue email for '%s' already sent and no new issues found, will send "
                    "a reminder in %s if the issues persist.",
                    btd_filesystem_get_mountpoint (bfs),
@@ -332,7 +332,8 @@ btd_scheduler_run_stats (BtdScheduler *self, BtdFilesystem *bfs, BtdFsRecord *re
                btd_filesystem_get_mountpoint (bfs));
 
     if (error_count > prev_error_count ||
-        (priv->reference_time - btd_fs_record_get_value_int (record, "messages", "broadcast_sent", 0) >
+        (priv->reference_time -
+             btd_fs_record_get_value_int (record, "messages", "broadcast_sent", 0) >
          SECONDS_IN_AN_HOUR * 6)) {
         g_autofree gchar *bc_message = NULL;
         /* broadcast message that there are errors to be fixed, do that roughly every 6h */
@@ -421,8 +422,8 @@ btd_scheduler_run_for_mount (BtdScheduler *self, BtdFilesystem *bfs)
     /* run all actions */
     for (guint i = 0; action_fn[i].func != NULL; i++) {
         interval_time = (time_t) btd_scheduler_get_config_duration_for_action (self,
-                                                                      bfs,
-                                                                      action_fn[i].action);
+                                                                               bfs,
+                                                                               action_fn[i].action);
         if (interval_time == 0) {
             btd_debug ("Skipping %s on %s, action is disabled.",
                        btd_btrfs_action_to_string (action_fn[i].action),
@@ -456,6 +457,17 @@ btd_scheduler_run_for_mount (BtdScheduler *self, BtdFilesystem *bfs)
     return TRUE;
 }
 
+static gint
+btd_filesystem_compare (gconstpointer fs_a, gconstpointer fs_b)
+{
+    const gchar *mount_a = btd_filesystem_get_mountpoint (
+        BTD_FILESYSTEM (*(BtdFilesystem **) fs_a));
+    const gchar *mount_b = btd_filesystem_get_mountpoint (
+        BTD_FILESYSTEM (*(BtdFilesystem **) fs_b));
+
+    return g_strcmp0 (mount_a, mount_b);
+}
+
 /**
  * btd_scheduler_run:
  * @self: An instance of #BtdScheduler
@@ -469,6 +481,7 @@ gboolean
 btd_scheduler_run (BtdScheduler *self, GError **error)
 {
     BtdSchedulerPrivate *priv = GET_PRIVATE (self);
+    g_autoptr(GHashTable) known_devices = g_hash_table_new (g_direct_hash, g_direct_equal);
 
     /* load configuration in case we haven't loaded it yet */
     if (!priv->loaded) {
@@ -491,13 +504,121 @@ btd_scheduler_run (BtdScheduler *self, GError **error)
         return TRUE;
     }
 
+    /* sort mountpoints to get a predictable order */
+    g_ptr_array_sort (priv->mountpoints, btd_filesystem_compare);
+
     /* run tasks */
     for (guint i = 0; i < priv->mountpoints->len; i++) {
         BtdFilesystem *bfs = g_ptr_array_index (priv->mountpoints, i);
+        dev_t devno = btd_filesystem_get_devno (bfs);
+
+        if (g_hash_table_contains (known_devices, GUINT_TO_POINTER (devno))) {
+            btd_debug ("Skipping %s, filesystem was already handled via a previous mount.",
+                       btd_filesystem_get_mountpoint (bfs));
+            continue;
+        }
+
+        g_hash_table_add (known_devices, GUINT_TO_POINTER (devno));
         btd_scheduler_run_for_mount (self, bfs);
     }
 
     return TRUE;
+}
+
+/**
+ * btd_scheduler_print_fs_status_entry:
+ * @self: An instance of #BtdScheduler
+ * @mountpoints: A #GPtrArray of #BtdFilesystem mountpoints which belong to the same filesystem
+ *
+ * Print filesystem scheduler status to stadout.
+ * Helper function for btd_scheduler_print_status
+ *
+ * Returns: %TRUE if no issues were found.
+ */
+static gboolean
+btd_scheduler_print_fs_status_entry (BtdScheduler *self, GPtrArray *mountpoints)
+{
+    BtdFilesystem *bfs;
+    gboolean errors_found = FALSE;
+    g_autoptr(GError) error = NULL;
+
+    if (mountpoints->len == 0)
+        return TRUE;
+
+    bfs = g_ptr_array_index (mountpoints, 0);
+    if (mountpoints->len > 1) {
+        g_autoptr(GString) mp_list = g_string_new (NULL);
+        for (guint i = 1; i < mountpoints->len; i++) {
+            BtdFilesystem *secondary = BTD_FILESYSTEM (g_ptr_array_index (mountpoints, i));
+            g_string_append (mp_list, btd_filesystem_get_mountpoint (secondary));
+
+            /* append comma if not the last element */
+            if (i < mountpoints->len - 1)
+                g_string_append_c (mp_list, ',');
+        }
+
+        g_print ("%c[%dm%s (%s) →  %s%c[%dm\n",
+                 0x1B,
+                 1,
+                 btd_filesystem_get_mountpoint (bfs),
+                 mp_list->str,
+                 btd_filesystem_get_device_name (bfs),
+                 0x1B,
+                 0);
+    } else {
+        g_print ("%c[%dm%s  →  %s%c[%dm\n",
+                 0x1B,
+                 1,
+                 btd_filesystem_get_mountpoint (bfs),
+                 btd_filesystem_get_device_name (bfs),
+                 0x1B,
+                 0);
+    }
+
+    for (guint j = BTD_BTRFS_ACTION_UNKNOWN + 1; j < BTD_BTRFS_ACTION_LAST; j++) {
+        g_autoptr(BtdFsRecord) record = NULL;
+        g_autofree gchar *last_action_time_str = NULL;
+        gint64 last_action_timestamp;
+        g_autofree gchar *interval_time = btd_humanize_time (
+            (gint64) btd_scheduler_get_config_duration_for_action (self, bfs, j));
+        g_print ("  • %s\n"
+                 "    Runs every %s\n",
+                 btd_btrfs_action_to_human_string (j),
+                 interval_time);
+
+        record = btd_fs_record_new (btd_filesystem_get_mountpoint (bfs));
+        if (!btd_fs_record_load (record, &error)) {
+            btd_warning ("Unable to load record for mount '%s': %s",
+                         btd_filesystem_get_mountpoint (bfs),
+                         error->message);
+            g_clear_error (&error);
+            errors_found = TRUE;
+            continue;
+        }
+
+        last_action_timestamp = btd_fs_record_get_last_action_time (record, j);
+        if (last_action_timestamp == 0 || btd_fs_record_is_new (record)) {
+            last_action_time_str = g_strdup ("Never");
+        } else {
+            g_autoptr(GDateTime) last_action_dt = NULL;
+            last_action_dt = g_date_time_new_from_unix_local (last_action_timestamp);
+            last_action_time_str = g_date_time_format (last_action_dt, "%Y-%m-%d %H:%M:%S");
+        }
+        g_print ("    Last run: %s\n", last_action_time_str);
+
+        if (j == BTD_BTRFS_ACTION_STATS) {
+            g_autofree gchar *mail_address = btd_scheduler_get_config_value (self,
+                                                                             bfs,
+                                                                             "mail_address",
+                                                                             NULL);
+            if (mail_address != NULL)
+                g_print ("    Error mails to: %s\n", mail_address);
+        }
+    }
+
+    g_print ("\n");
+
+    return !errors_found;
 }
 
 /**
@@ -512,70 +633,46 @@ gboolean
 btd_scheduler_print_status (BtdScheduler *self)
 {
     BtdSchedulerPrivate *priv = GET_PRIVATE (self);
-    g_autoptr(GError) error = NULL;
     gboolean errors_found = FALSE;
+    g_autoptr(GHashTable) devno_map = NULL;
+    GHashTableIter ht_iter;
+    gpointer ht_value;
 
     if (priv->mountpoints->len == 0) {
         g_print ("No mounted Btrfs filesystems found.\n");
         return TRUE;
     }
 
+    /* create a map of devno -> mountpoints */
+    devno_map = g_hash_table_new_full (g_direct_hash,
+                                       g_direct_equal,
+                                       NULL,
+                                       (GDestroyNotify) g_ptr_array_unref);
+    for (guint i = 0; i < priv->mountpoints->len; i++) {
+        BtdFilesystem *bfs = BTD_FILESYSTEM (g_ptr_array_index (priv->mountpoints, i));
+        GPtrArray *array = NULL;
+        dev_t devno = btd_filesystem_get_devno (bfs);
+
+        array = g_hash_table_lookup (devno_map, GUINT_TO_POINTER (devno));
+        if (!array) {
+            array = g_ptr_array_new_with_free_func (g_object_unref);
+            g_hash_table_insert (devno_map, GUINT_TO_POINTER (devno), array);
+        }
+        g_ptr_array_add (array, g_object_ref (bfs));
+    }
+
     g_print ("Running on battery: %s\n", btd_machine_is_on_battery () ? "yes" : "no");
 
     g_print ("Status:\n");
-    for (guint i = 0; i < priv->mountpoints->len; i++) {
-        BtdFilesystem *bfs = g_ptr_array_index (priv->mountpoints, i);
+    g_hash_table_iter_init (&ht_iter, devno_map);
+    while (g_hash_table_iter_next (&ht_iter, NULL, &ht_value)) {
+        GPtrArray *mps = (GPtrArray *) ht_value;
 
-        g_print ("%c[%dm%s  →  %s%c[%dm\n",
-                 0x1B,
-                 1,
-                 btd_filesystem_get_mountpoint (bfs),
-                 btd_filesystem_get_device_name (bfs),
-                 0x1B,
-                 0);
+        /* sort mountpoints to get a predictable order */
+        g_ptr_array_sort (mps, btd_filesystem_compare);
 
-        for (guint j = BTD_BTRFS_ACTION_UNKNOWN + 1; j < BTD_BTRFS_ACTION_LAST; j++) {
-            g_autoptr(BtdFsRecord) record = NULL;
-            g_autofree gchar *last_action_time_str = NULL;
-            gint64 last_action_timestamp;
-            g_autofree gchar *interval_time = btd_humanize_time (
-                (gint64) btd_scheduler_get_config_duration_for_action (self, bfs, j));
-            g_print ("  • %s\n"
-                     "    Runs every %s\n",
-                     btd_btrfs_action_to_human_string (j),
-                     interval_time);
-
-            record = btd_fs_record_new (btd_filesystem_get_mountpoint (bfs));
-            if (!btd_fs_record_load (record, &error)) {
-                btd_warning ("Unable to load record for mount '%s': %s",
-                             btd_filesystem_get_mountpoint (bfs),
-                             error->message);
-                g_clear_error (&error);
-                errors_found = TRUE;
-                continue;
-            }
-
-            last_action_timestamp = btd_fs_record_get_last_action_time (record, j);
-            if (last_action_timestamp == 0 || btd_fs_record_is_new (record)) {
-                last_action_time_str = g_strdup ("Never");
-            } else {
-                g_autoptr(GDateTime) last_action_dt = NULL;
-                last_action_dt = g_date_time_new_from_unix_local (last_action_timestamp);
-                last_action_time_str = g_date_time_format (last_action_dt, "%Y-%m-%d %H:%M:%S");
-            }
-            g_print ("    Last run: %s\n", last_action_time_str);
-
-            if (j == BTD_BTRFS_ACTION_STATS) {
-                g_autofree gchar *mail_address = btd_scheduler_get_config_value (self,
-                                                                                 bfs,
-                                                                                 "mail_address",
-                                                                                 NULL);
-                if (mail_address != NULL)
-                    g_print ("    Error mails to: %s\n", mail_address);
-            }
-        }
-
-        g_print ("\n");
+        if (!btd_scheduler_print_fs_status_entry (self, mps))
+            errors_found = TRUE;
     }
 
     return !errors_found;

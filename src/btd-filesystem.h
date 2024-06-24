@@ -45,10 +45,11 @@ struct _BtdFilesystemClass {
 
 GPtrArray     *btd_find_mounted_btrfs_filesystems (GError **error);
 
-BtdFilesystem *btd_filesystem_new (const gchar *device, const gchar *mountpoint);
+BtdFilesystem *btd_filesystem_new (const gchar *device, dev_t devno, const gchar *mountpoint);
 
 const gchar   *btd_filesystem_get_device_name (BtdFilesystem *self);
 const gchar   *btd_filesystem_get_mountpoint (BtdFilesystem *self);
+dev_t          btd_filesystem_get_devno (BtdFilesystem *self);
 
 gchar         *btd_filesystem_read_usage (BtdFilesystem *self, GError **error);
 

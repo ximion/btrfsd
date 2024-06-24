@@ -24,11 +24,13 @@
 typedef struct {
     gchar *device_name;
     gchar *mountpoint;
+    dev_t devno;
 } BtdFilesystemPrivate;
 
 enum {
     PROP_0,
     PROP_DEVICE_NAME,
+    PROP_DEVNO,
     PROP_MOUNTPOINT,
     N_PROPERTIES
 };
@@ -76,6 +78,7 @@ btd_find_mounted_btrfs_filesystems (GError **error)
     while (mnt_table_next_fs (table, iter, &fs) == 0) {
         if (g_strcmp0 (mnt_fs_get_fstype (fs), "btrfs") == 0) {
             BtdFilesystem *bmount = btd_filesystem_new (mnt_fs_get_source (fs),
+                                                        mnt_fs_get_devno (fs),
                                                         mnt_fs_get_target (fs));
             g_ptr_array_add (result, bmount);
         }
@@ -122,6 +125,9 @@ btd_filesystem_set_property (GObject *object,
         g_free (priv->device_name);
         priv->device_name = g_value_dup_string (value);
         break;
+    case PROP_DEVNO:
+        priv->devno = g_value_get_uint64 (value);
+        break;
     case PROP_MOUNTPOINT:
         g_free (priv->mountpoint);
         priv->mountpoint = g_value_dup_string (value);
@@ -143,6 +149,9 @@ btd_filesystem_get_property (GObject *object, guint property_id, GValue *value, 
     switch (property_id) {
     case PROP_DEVICE_NAME:
         g_value_set_string (value, priv->device_name);
+        break;
+    case PROP_DEVNO:
+        g_value_set_uint64 (value, priv->devno);
         break;
     case PROP_MOUNTPOINT:
         g_value_set_string (value, priv->mountpoint);
@@ -168,6 +177,14 @@ btd_filesystem_class_init (BtdFilesystemClass *klass)
                                                             G_PARAM_READWRITE |
                                                                 G_PARAM_CONSTRUCT_ONLY);
 
+    obj_properties[PROP_DEVNO] = g_param_spec_uint64 ("devno",
+                                                      "Devno",
+                                                      "Physical device number",
+                                                      0,
+                                                      G_MAXUINT64,
+                                                      0,
+                                                      G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+
     obj_properties[PROP_MOUNTPOINT] = g_param_spec_string ("mountpoint",
                                                            "Mountpoint",
                                                            "Mountpoint property",
@@ -186,12 +203,14 @@ btd_filesystem_class_init (BtdFilesystemClass *klass)
  * Returns: (transfer full): a #BtdFilesystem
  */
 BtdFilesystem *
-btd_filesystem_new (const gchar *device, const gchar *mountpoint)
+btd_filesystem_new (const gchar *device, dev_t devno, const gchar *mountpoint)
 {
     BtdFilesystem *self;
     self = g_object_new (BTD_TYPE_FILESYSTEM,
                          "device_name",
                          device,
+                         "devno",
+                         (guint64) devno,
                          "mountpoint",
                          mountpoint,
                          NULL);
@@ -222,6 +241,19 @@ btd_filesystem_get_mountpoint (BtdFilesystem *self)
 {
     BtdFilesystemPrivate *priv = GET_PRIVATE (self);
     return priv->mountpoint;
+}
+
+/**
+ * btd_filesystem_get_devno:
+ * @self: An instance of #BtdFilesystem.
+ *
+ * Returns: The device number.
+ */
+dev_t
+btd_filesystem_get_devno (BtdFilesystem *self)
+{
+    BtdFilesystemPrivate *priv = GET_PRIVATE (self);
+    return priv->devno;
 }
 
 /**
