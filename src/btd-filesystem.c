@@ -306,7 +306,7 @@ btd_parse_btrfs_device_stats (JsonArray *array, guint64 *errors_count)
 {
     g_autoptr(GString) intro_text = NULL;
     g_autoptr(GString) issues_text = NULL;
-    guint64 total_errors;
+    guint64 total_errors = 0;
 
     intro_text = g_string_new ("Registered Devices:\n");
     issues_text = g_string_new ("Issue Report:\n");
