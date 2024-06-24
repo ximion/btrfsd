@@ -28,6 +28,7 @@ eatmydata apt-get install -yq --no-install-recommends \
     systemd \
     libglib2.0-dev \
     libsystemd-dev \
+    systemd-dev \
     gtk-doc-tools \
     libmount-dev \
     libjson-glib-dev
