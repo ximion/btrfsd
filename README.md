@@ -34,7 +34,7 @@ It requires GLib, JSON-GLib, libsystemd, libmount and btrfs-progs.
 
 On Debian-based systems, you can install all dependencies via:
 ```bash
-sudo apt install btrfs-progs docbook-xsl libglib2.0-dev libjson-glib-dev libsystemd-dev meson xsltproc
+sudo apt install btrfs-progs docbook-xsl libglib2.0-dev libjson-glib-dev libsystemd-dev systemd-dev meson xsltproc
 ```
 
 You can the build the daemon:
